@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAPA OS · Distribuição diária</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#061618; --panel:#0B2327; --panel2:#0F2C31; --line:#174148;
+  --teal:#2AE0C0; --cyan:#3FB6F0; --amber:#FFB547; --alert:#FF4655;
+  --txt:#DCEFEF; --mut:#7CA3A8;
+  --f-disp:'Orbitron',system-ui,sans-serif; --f-txt:'Inter',system-ui,sans-serif; --f-mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:var(--f-txt);font-size:14px}
+body{display:flex;flex-direction:column;overflow:hidden}
+button,select,input{font-family:inherit;font-size:13px;color:var(--txt)}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+/* ---------- topo ---------- */
+header{display:flex;align-items:center;gap:18px;padding:10px 16px;background:linear-gradient(180deg,#0C2A2F,#081D21);border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap}
+.brand{font-family:var(--f-disp);font-weight:700;letter-spacing:.14em;font-size:15px;color:var(--teal);white-space:nowrap}
+.brand small{display:block;font-family:var(--f-txt);font-weight:400;letter-spacing:.04em;font-size:10px;color:var(--mut);text-transform:uppercase}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:5px 10px;display:flex;gap:8px;align-items:baseline}
+.chip b{font-family:var(--f-mono);font-size:15px;color:var(--teal)}
+.chip span{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.chip.warn b{color:var(--amber)} .chip.bad b{color:var(--alert)}
+#btnMenu{display:none;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:7px 11px}
+
+/* ---------- layout ---------- */
+main{flex:1;display:flex;min-height:0}
+aside{width:352px;flex:0 0 352px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;overscroll-behavior:contain}
+#map{flex:1;background:#08191C}
+
+.sec{border-bottom:1px solid var(--line)}
+.sec>h2{margin:0;font-family:var(--f-disp);font-weight:500;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);
+  padding:12px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.sec>h2::before{content:'';width:5px;height:5px;background:var(--line);transform:rotate(45deg);flex:0 0 auto}
+.sec.open>h2{color:var(--teal)} .sec.open>h2::before{background:var(--teal)}
+.sec>h2 .cnt{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--mut)}
+.sec>h2 .cnt.bad{color:var(--alert)}
+.body{display:none;padding:0 14px 16px}
+.sec.open .body{display:block}
+
+label.f{display:block;margin:9px 0 4px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+select,input[type=text],input[type=number],input[type=date]{width:100%;background:#082024;border:1px solid var(--line);border-radius:3px;padding:7px 8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{width:100%;background:var(--teal);color:#04191B;border:0;border-radius:3px;padding:10px;font-weight:600;letter-spacing:.03em}
+.btn:hover{filter:brightness(1.1)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:500}
+.btn.ghost:hover{border-color:var(--teal);color:var(--teal);filter:none}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:8px;margin-top:8px}
+
+#drop{border:1px dashed var(--line);border-radius:4px;padding:20px 12px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
+#drop:hover,#drop.over{border-color:var(--teal);color:var(--teal);background:#0A272B}
+#drop b{display:block;color:var(--txt);font-size:13px;margin-bottom:3px}
+#drop.over b{color:var(--teal)}
+
+.hint{font-size:11.5px;color:var(--mut);line-height:1.5;margin:8px 0 0}
+.bar{height:3px;background:#082024;border-radius:2px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--teal);width:0;transition:width .2s}
+
+/* ---------- alertas ---------- */
+.alerta{border-left:2px solid var(--amber);background:#12262A;border-radius:0 3px 3px 0;padding:9px 10px;margin-bottom:8px;cursor:pointer}
+.alerta:hover{background:#163037}
+.alerta.critico{border-left-color:var(--alert)}
+.alerta .t{display:flex;gap:8px;align-items:baseline}
+.alerta .n{font-family:var(--f-mono);font-weight:700;font-size:12px;color:var(--amber)}
+.alerta.critico .n{color:var(--alert)}
+.alerta .e{font-size:12.5px;font-weight:500;line-height:1.35}
+.alerta .d{font-size:11px;color:var(--mut);margin-top:4px;font-family:var(--f-mono)}
+
+/* ---------- rotas ---------- */
+.equipe{border:1px solid var(--line);border-radius:3px;margin-bottom:8px;overflow:hidden}
+.equipe>summary{list-style:none;padding:9px 10px;display:flex;align-items:center;gap:9px;cursor:pointer;background:var(--panel2)}
+.equipe>summary::-webkit-details-marker{display:none}
+.dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.equipe .nome{font-weight:600;font-size:12.5px}
+.equipe .meta{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--mut)}
+.parada{display:flex;gap:9px;padding:7px 10px;border-top:1px solid var(--line);font-size:12px;align-items:flex-start}
+.parada:hover{background:#0E2A2F;cursor:pointer}
+.parada .i{font-family:var(--f-mono);font-size:11px;color:var(--mut);min-width:16px}
+.parada .x{color:var(--alert);font-size:11px}
+.falha{font-size:12px;padding:7px 0;border-bottom:1px solid var(--line);color:var(--mut)}
+.falha b{color:var(--txt);display:block;font-weight:500}
+.falha button{background:none;border:0;color:var(--teal);padding:4px 0;font-size:11.5px;text-decoration:underline}
+
+/* ---------- marcadores ---------- */
+.pin{position:relative;width:26px;height:26px;border-radius:50% 50% 50% 3px;transform:rotate(-45deg);display:grid;place-items:center;box-shadow:0 3px 7px rgba(0,0,0,.55);border:1.5px solid rgba(2,20,22,.65)}
+.pin b{transform:rotate(45deg);font-family:var(--f-mono);font-weight:700;font-size:11px;color:#04161A}
+.pin.rein::after{content:'';position:absolute;inset:-7px;border:2px solid var(--alert);border-radius:50%;animation:pulso 1.9s ease-out infinite}
+.pin.base{border-radius:3px;background:#fff}
+@keyframes pulso{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.5);opacity:0}}
+@media (prefers-reduced-motion:reduce){.pin.rein::after{animation:none;opacity:.9}}
+.leaflet-popup-content-wrapper{background:var(--panel2);color:var(--txt);border-radius:4px;border:1px solid var(--line)}
+.leaflet-popup-tip{background:var(--panel2)}
+.leaflet-popup-content{margin:11px 13px;font-size:12.5px;line-height:1.5}
+.leaflet-popup-content h4{margin:0 0 5px;font-size:13px;font-family:var(--f-disp);font-weight:500;letter-spacing:.06em}
+.leaflet-popup-content .k{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.leaflet-container{background:#08191C}
+.leaflet-control-attribution{background:rgba(6,22,24,.8)!important;color:var(--mut)!important}
+.leaflet-control-attribution a{color:var(--mut)!important}
+
+#aviso{position:absolute;left:50%;transform:translateX(-50%);top:12px;z-index:900;background:var(--alert);color:#fff;
+  padding:9px 14px;border-radius:3px;font-size:12.5px;max-width:88%;display:none;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+#modo{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;z-index:900;background:var(--teal);color:#04191B;
+  padding:9px 16px;border-radius:3px;font-size:12.5px;font-weight:600;display:none}
+
+@media(max-width:820px){
+  #btnMenu{display:block}
+  aside{position:fixed;inset:49px auto 0 0;z-index:1000;width:88%;max-width:352px;transform:translateX(-101%);transition:transform .22s;box-shadow:8px 0 26px rgba(0,0,0,.5)}
+  aside.show{transform:none}
+  main{position:relative}
+  .stats{gap:6px} .chip{padding:4px 8px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <button id="btnMenu" aria-label="Abrir painel">☰</button>
+  <div class="brand">MAPA OS<small>distribuição diária</small></div>
+  <div class="stats">
+    <div class="chip"><b id="sTotal">0</b><span>OS</span></div>
+    <div class="chip"><b id="sPlot">0</b><span>no mapa</span></div>
+    <div class="chip warn"><b id="sRein">0</b><span>reincidentes</span></div>
+    <div class="chip bad"><b id="sFalha">0</b><span>sem endereço</span></div>
+  </div>
+</header>
+
+<main>
+<aside id="painel">
+
+  <!-- 1. arquivo -->
+  <section class="sec open" data-sec>
+    <h2>Arquivo do dia</h2>
+    <div class="body">
+      <div id="drop" tabindex="0" role="button">
+        <b>Solte a planilha aqui</b>
+        .xlsx, .xls ou .csv exportado do HubSoft
+      </div>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+      <label class="f">Data da agenda</label>
+      <input type="date" id="dia">
+      <div class="bar"><i id="prog"></i></div>
+      <p class="hint" id="statusImp">Nenhum arquivo carregado.</p>
+      <button class="btn ghost" id="btnDemo" style="margin-top:4px">Ver com dados de exemplo</button>
+    </div>
+  </section>
+
+  <!-- 2. colunas -->
+  <section class="sec" data-sec>
+    <h2>Colunas <span class="cnt" id="cntCol"></span></h2>
+    <div class="body">
+      <p class="hint" style="margin:0 0 6px">Detectadas automaticamente e memorizadas para os próximos dias.</p>
+      <div id="mapCols"></div>
+      <button class="btn ghost" id="btnRemap" style="margin-top:10px">Reprocessar com estas colunas</button>
+    </div>
+  </section>
+
+  <!-- 3. regras -->
+  <section class="sec" data-sec>
+    <h2>Regras</h2>
+    <div class="body">
+      <label class="f">Cidade / UF padrão (completa endereços incompletos)</label>
+      <input type="text" id="cfgCidade" placeholder="Ex.: Palmas, TO">
+      <label class="f">Considerar reincidência quando repetir</label>
+      <div class="grid2">
+        <select id="cfgChave">
+          <option value="endereco">o mesmo endereço</option>
+          <option value="cliente">o mesmo cliente</option>
+          <option value="contrato">o mesmo contrato/OS</option>
+        </select>
+        <select id="cfgJanela">
+          <option value="7">em 7 dias</option>
+          <option value="15">em 15 dias</option>
+          <option value="30">em 30 dias</option>
+        </select>
+      </div>
+      <div class="grid2" style="margin-top:9px">
+        <div><label class="f">Equipes</label><input type="number" id="cfgEquipes" min="1" max="8" value="3"></div>
+        <div><label class="f">Ponto de partida</label><button class="btn ghost" id="btnBase">Marcar no mapa</button></div>
+      </div>
+      <div id="nomesEquipes"></div>
+      <button class="btn" id="btnRecalc" style="margin-top:12px">Recalcular rotas</button>
+    </div>
+  </section>
+
+  <!-- 4. alertas -->
+  <section class="sec open" data-sec>
+    <h2>Reincidências <span class="cnt" id="cntRein"></span></h2>
+    <div class="body"><div id="listaRein"><p class="hint">Sem repetições no período.</p></div></div>
+  </section>
+
+  <!-- 5. rotas -->
+  <section class="sec" data-sec>
+    <h2>Rotas do dia <span class="cnt" id="cntRotas"></span></h2>
+    <div class="body"><div id="listaRotas"><p class="hint">Carregue a planilha para dividir as OS entre as equipes.</p></div></div>
+  </section>
+
+  <!-- 6. pendencias -->
+  <section class="sec" data-sec>
+    <h2>Sem localização <span class="cnt" id="cntFalha"></span></h2>
+    <div class="body"><div id="listaFalha"><p class="hint">Nenhuma pendência.</p></div></div>
+  </section>
+
+  <!-- 7. base -->
+  <section class="sec" data-sec>
+    <h2>Histórico</h2>
+    <div class="body">
+      <div id="resumoHist"><p class="hint">Nenhum dia salvo ainda.</p></div>
+      <div class="row"><button class="btn ghost" id="btnExpCsv">Exportar dia (CSV)</button></div>
+      <div class="row"><button class="btn ghost" id="btnExpPlano">Exportar plano de despacho (JSON)</button></div>
+      <div class="row">
+        <button class="btn ghost" id="btnExpBase">Salvar base</button>
+        <button class="btn ghost" id="btnImpBase">Restaurar base</button>
+      </div>
+      <input type="file" id="fileBase" accept=".json" hidden>
+      <p class="hint">A base guarda o histórico dos dias e os endereços já localizados, para não geocodificar tudo de novo.</p>
+    </div>
+  </section>
+
+</aside>
+
+<div style="flex:1;position:relative;display:flex">
+  <div id="map"></div>
+  <div id="aviso"></div>
+  <div id="modo"></div>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ============================================================
+   MAPA OS — plotagem e distribuição diária de ordens de serviço
+   ============================================================ */
+
+const CORES = ['#2AE0C0','#3FB6F0','#FFB547','#9A7BFF','#FF7BB0','#A8E05F','#FF8A47','#6C8CFF'];
+const $ = s => document.querySelector(s);
+
+/* ---------- armazenamento ----------
+   1) storage do ambiente de preview, quando existe
+   2) armazenamento local do navegador (GitHub Pages ou arquivo aberto no PC)
+   3) memória, como último recurso                                            */
+const memoria = {};
+const Base = {
+  async get(k){
+    try{ const r = await window.storage.get(k); if(r) return JSON.parse(r.value); }catch(e){}
+    try{ const v = localStorage.getItem(k); if(v) return JSON.parse(v); }catch(e){}
+    return memoria[k] ?? null;
+  },
+  async set(k,v){
+    const s = JSON.stringify(v);
+    memoria[k] = v;
+    try{ await window.storage.set(k,s); return; }catch(e){}
+    try{ localStorage.setItem(k,s); }catch(e){}
+  }
+};
+const K_HIST='mapaos:historico', K_GEO='mapaos:enderecos', K_CFG='mapaos:config';
+
+/* ---------- estado ---------- */
+let cfg = {cols:{}, cidade:'', chave:'endereco', janela:7, equipes:3, base:null};
+let historico = {};   // 'AAAA-MM-DD' -> [{k, endereco, cliente, os, tipo}]
+let cacheGeo = {};    // endereço normalizado -> [lat, lon]
+let itens = [];       // OS do dia
+let colunasArquivo = [];
+let camadas = {marcadores:null, rotas:null, base:null};
+let mapa, cliqueMapa = null, cancelar = false;
+
+/* ---------- utilidades ---------- */
+const semAcento = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const norm = s => semAcento(s).toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const hoje = () => new Date().toISOString().slice(0,10);
+const brDate = d => d.split('-').reverse().slice(0,2).join('/');
+const esc = s => String(s??'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+function aviso(txt){ const a=$('#aviso'); a.textContent=txt; a.style.display='block'; }
+function modo(txt){ const m=$('#modo'); if(txt){m.textContent=txt;m.style.display='block';} else m.style.display='none'; }
+
+/* ---------- mapa ---------- */
+function iniciarMapa(){
+  mapa = L.map('map',{zoomControl:true, attributionControl:true}).setView([-14.24,-51.92],4);
+  let erros = 0;
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    maxZoom:19, subdomains:'abcd',
+    attribution:'&copy; OpenStreetMap &copy; CARTO'
+  }).addTo(mapa).on('tileerror',()=>{ if(++erros===8) aviso('O mapa de fundo foi bloqueado neste ambiente. Baixe este arquivo e abra direto no navegador — os marcadores continuam funcionando.'); });
+
+  camadas.marcadores = L.layerGroup().addTo(mapa);
+  camadas.rotas = L.layerGroup().addTo(mapa);
+
+  mapa.on('click', e => {
+    if(!cliqueMapa) return;
+    const fn = cliqueMapa; cliqueMapa = null; modo(null);
+    fn(e.latlng);
+  });
+}
+
+/* ---------- leitura da planilha ---------- */
+async function lerArquivo(file){
+  if(histReal !== null){ historico = histReal; histReal = null; }
+  $('#statusImp').textContent = 'Lendo ' + file.name + '…';
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const wb = XLSX.read(buf,{type:'array', raw:false});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(ws,{header:1, defval:'', raw:false, blankrows:false});
+  if(!aoa.length){ $('#statusImp').textContent='A planilha está vazia.'; return; }
+
+  // acha a linha de cabeçalho (relatórios do HubSoft costumam ter linhas de título antes)
+  let li=0, melhor=0;
+  for(let i=0;i<Math.min(12,aoa.length);i++){
+    const n = aoa[i].filter(v=>String(v).trim()!=='').length;
+    if(n>melhor){melhor=n;li=i;}
+  }
+  const cab = aoa[li].map((h,i)=> String(h).trim() || ('coluna_'+(i+1)));
+  const linhas = aoa.slice(li+1)
+    .filter(r=>r.some(v=>String(v).trim()!==''))
+    .map(r=>{ const o={}; cab.forEach((h,i)=> o[h]=String(r[i]??'').trim()); return o; });
+
+  colunasArquivo = cab;
+  detectarColunas(cab);
+  desenharMapeamento();
+  await processar(linhas);
+}
+
+/* ---------- detecção de colunas ---------- */
+const CAMPOS = [
+  ['endereco','Endereço / logradouro',['endereco','logradouro','rua','end','local','localizacao']],
+  ['numero','Número',['numero','num','nº','n°','nro']],
+  ['bairro','Bairro',['bairro','setor','quadra']],
+  ['cidade','Cidade',['cidade','municipio','localidade']],
+  ['uf','UF',['uf','estado']],
+  ['cep','CEP',['cep','codigo postal']],
+  ['cliente','Cliente',['cliente','nome','assinante','razao social','razao']],
+  ['os','Nº da OS',['os','ordem','ordem de servico','protocolo','chamado','codigo','id']],
+  ['contrato','Contrato',['contrato','codigo cliente','id cliente','cod cliente']],
+  ['tipo','Tipo de serviço',['tipo','servico','motivo','assunto','descricao','categoria']],
+  ['tecnico','Técnico / equipe',['tecnico','equipe','responsavel','atendente','executor']],
+  ['periodo','Período',['periodo','turno','horario','hora','agendamento','agendado']],
+  ['lat','Latitude',['lat','latitude']],
+  ['lon','Longitude',['lon','lng','long','longitude']]
+];
+
+function detectarColunas(cab){
+  const salvo = cfg.cols || {};
+  const achou = {};
+  CAMPOS.forEach(([campo,,chaves])=>{
+    if(salvo[campo] && cab.includes(salvo[campo])){ achou[campo]=salvo[campo]; return; }
+    const exato = cab.find(h => chaves.includes(norm(h)));
+    if(exato){ achou[campo]=exato; return; }
+    const parcial = cab.find(h => chaves.some(c => norm(h).includes(c)));
+    if(parcial) achou[campo]=parcial;
+  });
+  cfg.cols = achou;
+}
+
+function desenharMapeamento(){
+  const alvo = $('#mapCols'); alvo.innerHTML='';
+  CAMPOS.forEach(([campo,rotulo])=>{
+    const l = document.createElement('label'); l.className='f'; l.textContent=rotulo;
+    const s = document.createElement('select'); s.dataset.campo=campo;
+    s.innerHTML = '<option value="">— não usar —</option>' +
+      colunasArquivo.map(c=>`<option${cfg.cols[campo]===c?' selected':''}>${esc(c)}</option>`).join('');
+    alvo.append(l,s);
+  });
+  const usados = Object.values(cfg.cols).filter(Boolean).length;
+  $('#cntCol').textContent = usados + '/' + CAMPOS.length;
+}
+
+/* ---------- montagem dos itens ---------- */
+function montarEndereco(l){
+  const c = cfg.cols, p = [];
+  const rua = l[c.endereco]||'';
+  const num = l[c.numero]||'';
+  if(rua) p.push(num && !/\d/.test(rua) ? rua+', '+num : rua);
+  if(c.bairro && l[c.bairro]) p.push(l[c.bairro]);
+  if(c.cidade && l[c.cidade]) p.push(l[c.cidade]);
+  else if(cfg.cidade) p.push(cfg.cidade);
+  if(c.uf && l[c.uf]) p.push(l[c.uf]);
+  if(c.cep && l[c.cep]) p.push(l[c.cep]);
+  return p.join(', ').replace(/\s+/g,' ').trim();
+}
+
+function chaveOcorrencia(it){
+  if(cfg.chave==='cliente') return 'c:'+norm(it.cliente);
+  if(cfg.chave==='contrato') return 'k:'+norm(it.contrato||it.os);
+  return 'e:'+norm(it.endereco);
+}
+
+async function processar(linhas){
+  const c = cfg.cols;
+  itens = linhas.map((l,i)=>{
+    const it = {
+      idx:i,
+      endereco: montarEndereco(l),
+      cliente: c.cliente ? l[c.cliente] : '',
+      os: c.os ? l[c.os] : String(i+1),
+      contrato: c.contrato ? l[c.contrato] : '',
+      tipo: c.tipo ? l[c.tipo] : '',
+      tecnico: c.tecnico ? l[c.tecnico] : '',
+      periodo: c.periodo ? l[c.periodo] : '',
+      lat:null, lon:null
+    };
+    if(c.lat && c.lon){
+      const la = parseFloat(String(l[c.lat]).replace(',','.')), lo = parseFloat(String(l[c.lon]).replace(',','.'));
+      if(!isNaN(la) && !isNaN(lo)){ it.lat=la; it.lon=lo; }
+    }
+    it.k = chaveOcorrencia(it);
+    return it;
+  }).filter(it => it.endereco || it.lat);
+
+  $('#statusImp').textContent = itens.length + ' OS lidas. Localizando endereços…';
+  await geocodificarTodos();
+  analisarReincidencia();
+  await salvarDia();
+  montarRotas();
+  desenharTudo();
+  await Base.set(K_CFG, cfg);
+  $('#statusImp').textContent = itens.length + ' OS carregadas em ' + brDate($('#dia').value) + '.';
+}
+
+/* ---------- geocodificação (OpenStreetMap / Nominatim) ---------- */
+async function geocodificarTodos(){
+  cancelar = false;
+  const pend = itens.filter(it => !it.lat && it.endereco);
+  let feitos = 0, falhouRede = 0;
+  for(const it of pend){
+    if(cancelar) break;
+    const chave = norm(it.endereco);
+    if(cacheGeo[chave]){ [it.lat,it.lon] = cacheGeo[chave]; }
+    else{
+      try{
+        const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&q=' + encodeURIComponent(it.endereco);
+        const r = await fetch(url,{headers:{'Accept':'application/json'}});
+        const j = await r.json();
+        if(j && j[0]){
+          it.lat = parseFloat(j[0].lat); it.lon = parseFloat(j[0].lon);
+          cacheGeo[chave] = [it.lat, it.lon];
+        }
+      }catch(e){
+        if(++falhouRede === 3){
+          aviso('Não consegui consultar o serviço de endereços daqui. Baixe este arquivo e abra no navegador, ou inclua colunas de latitude e longitude na planilha.');
+          break;
+        }
+      }
+      await new Promise(r=>setTimeout(r,1100)); // limite de 1 consulta por segundo
+    }
+    feitos++;
+    $('#prog').style.width = Math.round(feitos/pend.length*100)+'%';
+    $('#statusImp').textContent = 'Localizando endereços… ' + feitos + '/' + pend.length;
+  }
+  $('#prog').style.width='0';
+  await Base.set(K_GEO, cacheGeo);
+}
+
+/* ---------- reincidência ---------- */
+function analisarReincidencia(){
+  const dia = $('#dia').value;
+  const corte = new Date(dia+'T12:00:00');
+  corte.setDate(corte.getDate() - (cfg.janela-1));
+  const limite = corte.toISOString().slice(0,10);
+
+  const anteriores = {};
+  Object.entries(historico).forEach(([d,arr])=>{
+    if(d===dia || d<limite || d>dia) return;
+    arr.forEach(r=>{ (anteriores[r.k] = anteriores[r.k] || []).push({d, os:r.os, tipo:r.tipo}); });
+  });
+  const hojeCont = {};
+  itens.forEach(it => hojeCont[it.k] = (hojeCont[it.k]||0)+1);
+
+  itens.forEach(it=>{
+    it.anteriores = anteriores[it.k] || [];
+    it.repetidoHoje = hojeCont[it.k] > 1;
+    it.total = it.anteriores.length + hojeCont[it.k];
+    it.nivel = it.total>=3 ? 'critico' : it.total>=2 ? 'alerta' : 'ok';
+  });
+}
+
+async function salvarDia(){
+  const dia = $('#dia').value;
+  historico[dia] = itens.map(it=>({k:it.k, endereco:it.endereco, cliente:it.cliente, os:it.os, tipo:it.tipo}));
+  const dias = Object.keys(historico).sort().slice(-90);
+  const novo = {}; dias.forEach(d=> novo[d]=historico[d]);
+  historico = novo;
+  await Base.set(K_HIST, historico);
+}
+
+/* ---------- divisão por equipes + ordem de visita ---------- */
+function montarRotas(){
+  const pts = itens.filter(it=>it.lat);
+  const k = Math.max(1, Math.min(cfg.equipes|0 || 1, 8));
+  if(!pts.length) return;
+
+  // k-means simples
+  let centros = [];
+  const passo = Math.max(1, Math.floor(pts.length/k));
+  for(let i=0;i<k;i++){ const p = pts[Math.min(i*passo, pts.length-1)]; centros.push([p.lat,p.lon]); }
+  for(let it=0; it<40; it++){
+    pts.forEach(p=>{
+      let melhor=0, dm=Infinity;
+      centros.forEach((c,i)=>{ const d=(p.lat-c[0])**2+(p.lon-c[1])**2; if(d<dm){dm=d;melhor=i;} });
+      p.equipe = melhor;
+    });
+    let mudou=false;
+    centros = centros.map((c,i)=>{
+      const g = pts.filter(p=>p.equipe===i);
+      if(!g.length) return c;
+      const nc = [g.reduce((s,p)=>s+p.lat,0)/g.length, g.reduce((s,p)=>s+p.lon,0)/g.length];
+      if(Math.abs(nc[0]-c[0])>1e-7||Math.abs(nc[1]-c[1])>1e-7) mudou=true;
+      return nc;
+    });
+    if(!mudou) break;
+  }
+
+  // equilibra a carga entre as equipes
+  const teto = Math.ceil(pts.length/k);
+  for(let volta=0; volta<60; volta++){
+    const grupos = centros.map((_,i)=>pts.filter(p=>p.equipe===i));
+    const cheio = grupos.findIndex(g=>g.length>teto);
+    if(cheio<0) break;
+    const g = grupos[cheio];
+    const c = centros[cheio];
+    g.sort((a,b)=> ((b.lat-c[0])**2+(b.lon-c[1])**2) - ((a.lat-c[0])**2+(a.lon-c[1])**2));
+    const alvo = grupos.map((gr,i)=>({i, n:gr.length})).filter(o=>o.n<teto).sort((a,b)=>a.n-b.n)[0];
+    if(!alvo) break;
+    g[0].equipe = alvo.i;
+  }
+
+  // ordem de visita: vizinho mais próximo a partir da base, depois refino 2-opt
+  const dist = (a,b)=> Math.hypot((a.lat-b.lat)*111, (a.lon-b.lon)*111*Math.cos(a.lat*Math.PI/180));
+  for(let i=0;i<k;i++){
+    let restam = pts.filter(p=>p.equipe===i);
+    if(!restam.length) continue;
+    let atual = cfg.base ? {lat:cfg.base[0], lon:cfg.base[1]} : restam[0];
+    const ordem=[];
+    while(restam.length){
+      let m=0, dm=Infinity;
+      restam.forEach((p,j)=>{ const d=dist(atual,p); if(d<dm){dm=d;m=j;} });
+      atual = restam[m]; ordem.push(atual); restam.splice(m,1);
+    }
+    for(let passo=0; passo<40; passo++){
+      let ganhou = false;
+      for(let a=0; a<ordem.length-2; a++){
+        for(let b=a+2; b<ordem.length; b++){
+          const seguinte = ordem[b+1];
+          const d1 = dist(ordem[a],ordem[a+1]) + (seguinte ? dist(ordem[b],seguinte) : 0);
+          const d2 = dist(ordem[a],ordem[b]) + (seguinte ? dist(ordem[a+1],seguinte) : 0);
+          if(d2 < d1 - 1e-9){
+            const trecho = ordem.slice(a+1,b+1).reverse();
+            ordem.splice(a+1, b-a, ...trecho);
+            ganhou = true;
+          }
+        }
+      }
+      if(!ganhou) break;
+    }
+    ordem.forEach((p,j)=> p.ordem = j+1);
+  }
+}
+
+/* ---------- desenho ---------- */
+function desenharTudo(){
+  camadas.marcadores.clearLayers();
+  camadas.rotas.clearLayers();
+
+  const comLocal = itens.filter(it=>it.lat);
+  comLocal.forEach(it=>{
+    const cor = CORES[(it.equipe||0) % CORES.length];
+    const icone = L.divIcon({
+      className:'', iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-24],
+      html:`<div class="pin ${it.nivel!=='ok'?'rein':''}" style="background:${cor}"><b>${it.ordem||''}</b></div>`
+    });
+    const m = L.marker([it.lat,it.lon],{icon:icone}).addTo(camadas.marcadores);
+    m.bindPopup(popup(it));
+    it._m = m;
+  });
+
+  // linhas das rotas
+  const equipes = [...new Set(comLocal.map(it=>it.equipe||0))];
+  equipes.forEach(e=>{
+    const g = comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>(a.ordem||0)-(b.ordem||0));
+    const pts = g.map(it=>[it.lat,it.lon]);
+    if(cfg.base) pts.unshift(cfg.base);
+    if(pts.length>1) L.polyline(pts,{color:CORES[e%CORES.length], weight:2, opacity:.5, dashArray:'5 6'}).addTo(camadas.rotas);
+  });
+
+  if(cfg.base){
+    if(camadas.base) mapa.removeLayer(camadas.base);
+    camadas.base = L.marker(cfg.base,{icon:L.divIcon({className:'',iconSize:[16,16],iconAnchor:[8,8],
+      html:'<div class="pin base" style="width:16px;height:16px;transform:none"></div>'})}).addTo(mapa);
+  }
+
+  if(comLocal.length){
+    const b = L.latLngBounds(comLocal.map(it=>[it.lat,it.lon]));
+    if(cfg.base) b.extend(cfg.base);
+    mapa.fitBounds(b,{padding:[45,45], maxZoom:15});
+  }
+
+  atualizarPaineis();
+}
+
+function popup(it){
+  const h = [];
+  h.push(`<h4>OS ${esc(it.os)}</h4>`);
+  if(it.cliente) h.push(`<div>${esc(it.cliente)}</div>`);
+  h.push(`<div class="k" style="margin-top:6px">Endereço</div><div>${esc(it.endereco)}</div>`);
+  if(it.tipo) h.push(`<div class="k" style="margin-top:6px">Serviço</div><div>${esc(it.tipo)}</div>`);
+  if(it.periodo) h.push(`<div class="k" style="margin-top:6px">Período</div><div>${esc(it.periodo)}</div>`);
+  h.push(`<div class="k" style="margin-top:6px">Equipe</div><div>${esc(nomeEquipe(it.equipe||0))} · parada ${it.ordem||'-'}</div>`);
+  if(it.nivel!=='ok'){
+    const datas = it.anteriores.map(a=>brDate(a.d)).join(', ');
+    h.push(`<div style="margin-top:8px;padding-top:7px;border-top:1px solid #174148;color:${it.nivel==='critico'?'#FF4655':'#FFB547'}">
+      <b>${it.total}ª ocorrência em ${cfg.janela} dias</b>${datas?`<br><span style="color:#7CA3A8">Antes em ${datas}</span>`:''}
+      ${it.repetidoHoje?'<br><span style="color:#7CA3A8">Aparece mais de uma vez hoje</span>':''}</div>`);
+  }
+  const g = `https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lon}`;
+  h.push(`<div style="margin-top:8px"><a href="${g}" target="_blank" rel="noopener" style="color:#2AE0C0">Abrir no Google Maps</a></div>`);
+  return h.join('');
+}
+
+/* ---------- painéis ---------- */
+function atualizarPaineis(){
+  const comLocal = itens.filter(it=>it.lat);
+  const rein = itens.filter(it=>it.nivel!=='ok');
+  const falhas = itens.filter(it=>!it.lat);
+
+  $('#sTotal').textContent = itens.length;
+  $('#sPlot').textContent = comLocal.length;
+  $('#sRein').textContent = rein.length;
+  $('#sFalha').textContent = falhas.length;
+  $('#cntRein').textContent = rein.length || '';
+  $('#cntRein').className = 'cnt' + (rein.length?' bad':'');
+  $('#cntFalha').textContent = falhas.length || '';
+
+  // reincidências
+  const lr = $('#listaRein');
+  if(!rein.length) lr.innerHTML = '<p class="hint">Nenhuma repetição nos últimos '+cfg.janela+' dias.</p>';
+  else{
+    lr.innerHTML = rein.sort((a,b)=>b.total-a.total).map(it=>`
+      <div class="alerta ${it.nivel==='critico'?'critico':''}" data-os="${esc(it.os)}">
+        <div class="t"><span class="n">${it.total}×</span><span class="e">${esc(it.cliente||it.endereco)}</span></div>
+        <div class="d">OS ${esc(it.os)}${it.tipo?' · '+esc(it.tipo):''}</div>
+        <div class="d">${it.anteriores.length? 'antes em '+it.anteriores.map(a=>brDate(a.d)).join(', ') : 'repetida na própria agenda de hoje'}</div>
+      </div>`).join('');
+    lr.querySelectorAll('.alerta').forEach(el=> el.onclick = ()=>{
+      const it = itens.find(x=>String(x.os)===el.dataset.os);
+      if(it && it._m){ mapa.setView([it.lat,it.lon],17); it._m.openPopup(); fecharPainel(); }
+    });
+  }
+
+  // rotas
+  const eq = [...new Set(comLocal.map(it=>it.equipe||0))].sort();
+  $('#cntRotas').textContent = eq.length ? eq.length+' equipes' : '';
+  const lrt = $('#listaRotas');
+  if(!eq.length) lrt.innerHTML='<p class="hint">Carregue a planilha para dividir as OS entre as equipes.</p>';
+  else lrt.innerHTML = eq.map(e=>{
+    const g = comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>a.ordem-b.ordem);
+    const alertas = g.filter(it=>it.nivel!=='ok').length;
+    const link = linkRota(g);
+    return `<details class="equipe"><summary><span class="dot" style="background:${CORES[e%CORES.length]}"></span>
+      <span class="nome">${esc(nomeEquipe(e))}</span><span class="meta">${g.length} OS${alertas?' · '+alertas+' ⚠':''}</span></summary>
+      ${g.map(it=>`<div class="parada" data-os="${esc(it.os)}"><span class="i">${it.ordem}</span>
+        <span>${esc(it.cliente||it.endereco)}<br><span style="color:#7CA3A8;font-size:11px">${esc(it.endereco)}</span>
+        ${it.nivel!=='ok'?`<br><span class="x">${it.total}ª vez em ${cfg.janela} dias</span>`:''}</span></div>`).join('')}
+      <div style="padding:9px 10px;border-top:1px solid #174148"><a href="${link}" target="_blank" rel="noopener" style="color:#2AE0C0;font-size:12px">Abrir rota no Google Maps</a></div>
+    </details>`;
+  }).join('');
+  lrt.querySelectorAll('.parada').forEach(el=> el.onclick = ()=>{
+    const it = itens.find(x=>String(x.os)===el.dataset.os);
+    if(it && it._m){ mapa.setView([it.lat,it.lon],17); it._m.openPopup(); fecharPainel(); }
+  });
+
+  // pendências
+  const lf = $('#listaFalha');
+  if(!falhas.length) lf.innerHTML='<p class="hint">Nenhuma pendência.</p>';
+  else lf.innerHTML = falhas.map((it,i)=>`<div class="falha"><b>OS ${esc(it.os)} · ${esc(it.cliente)}</b>${esc(it.endereco)||'<i>sem endereço na planilha</i>'}
+    <button data-i="${it.idx}">marcar no mapa</button></div>`).join('');
+  lf.querySelectorAll('.falha button').forEach(b=> b.onclick = ()=>{
+    const it = itens.find(x=>x.idx===+b.dataset.i);
+    fecharPainel();
+    modo('Toque no mapa onde fica: ' + (it.endereco || it.cliente || ('OS '+it.os)));
+    cliqueMapa = async ll => {
+      it.lat=ll.lat; it.lon=ll.lng;
+      if(it.endereco){ cacheGeo[norm(it.endereco)] = [ll.lat,ll.lng]; await Base.set(K_GEO,cacheGeo); }
+      montarRotas(); desenharTudo();
+    };
+  });
+
+  // histórico
+  const dias = Object.keys(historico).sort().reverse();
+  const rh = $('#resumoHist');
+  if(!dias.length) rh.innerHTML='<p class="hint">Nenhum dia salvo ainda.</p>';
+  else{
+    const cont = {};
+    const corte = new Date($('#dia').value+'T12:00:00'); corte.setDate(corte.getDate()-(cfg.janela-1));
+    const lim = corte.toISOString().slice(0,10);
+    dias.filter(d=>d>=lim).forEach(d=> historico[d].forEach(r=>{
+      cont[r.k] = cont[r.k] || {n:0, rot:r.cliente||r.endereco};
+      cont[r.k].n++;
+    }));
+    const top = Object.values(cont).filter(o=>o.n>1).sort((a,b)=>b.n-a.n).slice(0,5);
+    rh.innerHTML = `<p class="hint" style="margin:0">${dias.length} dias salvos · último ${brDate(dias[0])}</p>` +
+      (top.length? '<p class="hint" style="margin-top:8px;color:#DCEFEF">Mais repetidos em '+cfg.janela+' dias</p>' +
+        top.map(o=>`<div class="d" style="font-size:11.5px;color:#7CA3A8;font-family:var(--f-mono)">${o.n}× ${esc(o.rot)}</div>`).join('') : '');
+  }
+}
+
+function linkRota(g){
+  const pts = g.slice(0,10);
+  if(!pts.length) return '#';
+  const orig = cfg.base ? cfg.base[0]+','+cfg.base[1] : pts[0].lat+','+pts[0].lon;
+  const dest = pts[pts.length-1];
+  const meio = pts.slice(cfg.base?0:1, -1).map(p=>p.lat+','+p.lon).join('|');
+  return `https://www.google.com/maps/dir/?api=1&origin=${orig}&destination=${dest.lat},${dest.lon}` + (meio?`&waypoints=${meio}`:'');
+}
+
+/* ---------- demonstração (dados fictícios) ---------- */
+const DEMO = [
+ ['Qd 104 Norte, Alameda 12, Lote 5','Ana Bezerra','48210','Sem sinal','Manhã',-10.1742,-48.3325],
+ ['Qd 108 Norte, Alameda 4, Lote 22','Carlos Menezes','48211','Instalação','Manhã',-10.1795,-48.3361],
+ ['Qd 106 Norte, Alameda 9, Lote 11','Rita Andrade','48212','Troca de ONU','Tarde',-10.1768,-48.3298],
+ ['Qd 110 Norte, Alameda 7, Lote 3','Jonas Prado','48213','Lentidão','Tarde',-10.1821,-48.3340],
+ ['Qd 102 Norte, Alameda 3, Lote 18','Marta Siqueira','48214','Mudança de endereço','Manhã',-10.1710,-48.3352],
+ ['Qd 112 Norte, Alameda 15, Lote 9','Edson Rocha','48215','Sem sinal','Manhã',-10.1850,-48.3312],
+ ['Qd 203 Sul, Alameda 8, Lote 14','Luciana Torres','48216','Instalação','Tarde',-10.2431,-48.3267],
+ ['Qd 207 Sul, Alameda 11, Lote 2','Pedro Vilar','48217','Troca de roteador','Manhã',-10.2478,-48.3241],
+ ['Qd 205 Sul, Alameda 5, Lote 7','Sandra Lopes','48218','Lentidão','Tarde',-10.2455,-48.3298],
+ ['Qd 209 Sul, Alameda 2, Lote 20','Rafael Nunes','48219','Sem sinal','Manhã',-10.2502,-48.3275],
+ ['Qd 201 Sul, Alameda 6, Lote 12','Teresa Cardoso','48220','Retirada de equipamento','Tarde',-10.2408,-48.3230],
+ ['Rua 12, Qd 4, Lote 30, Taquaralto','Iracema Dias','48221','Instalação','Manhã',-10.2884,-48.3115],
+ ['Rua 5, Qd 9, Lote 8, Taquaralto','Gilson Farias','48222','Sem sinal','Tarde',-10.2921,-48.3078],
+ ['Rua 20, Qd 2, Lote 17, Taquaralto','Nadia Correia','48223','Troca de ONU','Tarde',-10.2866,-48.3042],
+ ['Rua 8, Qd 11, Lote 1, Taquaralto','Otávio Braga','48224','Lentidão','Manhã',-10.2949,-48.3131],
+ ['Rua 15, Qd 7, Lote 25, Taquaralto','Fabiana Reis','48225','Instalação','Manhã',-10.2903,-48.3160]
+];
+let histReal = null;
+
+function carregarExemplo(){
+  if(histReal === null) histReal = historico;
+  lerConfig();
+  const dia = $('#dia').value;
+  itens = DEMO.map((d,i)=>({
+    idx:i, endereco:d[0]+', Palmas, TO', cliente:d[1], os:d[2], contrato:'', tipo:d[3],
+    tecnico:'', periodo:d[4], lat:d[5], lon:d[6]
+  }));
+  itens.forEach(it => it.k = chaveOcorrencia(it));
+
+  const passado = {};
+  const diaAtras = (n, idxs)=>{
+    const dt = new Date(dia+'T12:00:00'); dt.setDate(dt.getDate()-n);
+    passado[dt.toISOString().slice(0,10)] = idxs.map(i=>({
+      k:itens[i].k, endereco:itens[i].endereco, cliente:itens[i].cliente, os:'4'+(8100+i), tipo:itens[i].tipo
+    }));
+  };
+  diaAtras(2,[0,5]); diaAtras(4,[0]); diaAtras(6,[9]);
+  historico = passado;
+
+  analisarReincidencia(); montarRotas(); desenharTudo();
+  $('#statusImp').textContent = 'Modo demonstração: 16 OS fictícias. Nada foi salvo na sua base.';
+  document.querySelectorAll('[data-sec]')[3].classList.add('open');
+}
+
+/* ---------- equipes ---------- */
+const nomeEquipe = i => (cfg.nomes && cfg.nomes[i]) ? cfg.nomes[i] : 'Equipe ' + (i+1);
+
+function desenharNomes(){
+  const alvo = $('#nomesEquipes'); alvo.innerHTML='';
+  cfg.nomes = cfg.nomes || [];
+  const l = document.createElement('label'); l.className='f'; l.textContent='Técnico ou equipe responsável';
+  alvo.append(l);
+  for(let i=0;i<(cfg.equipes||3);i++){
+    const inp = document.createElement('input');
+    inp.type='text'; inp.value = cfg.nomes[i] || ''; inp.placeholder = 'Equipe ' + (i+1);
+    inp.style.marginBottom='6px';
+    inp.style.borderLeft = '3px solid ' + CORES[i % CORES.length];
+    inp.onchange = ()=>{ cfg.nomes[i] = inp.value.trim(); Base.set(K_CFG,cfg); atualizarPaineis(); };
+    alvo.append(inp);
+  }
+}
+
+/* ---------- exportações ---------- */
+function exportarPlano(){
+  if(!itens.length) return;
+  const comLocal = itens.filter(it=>it.lat);
+  const eq = [...new Set(comLocal.map(it=>it.equipe||0))].sort();
+  const plano = {
+    data: $('#dia').value,
+    gerado_em: new Date().toISOString(),
+    criterio_reincidencia: cfg.chave,
+    janela_dias: cfg.janela,
+    equipes: eq.map(e=>({
+      nome: nomeEquipe(e),
+      paradas: comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>a.ordem-b.ordem).map(it=>({
+        ordem: it.ordem, os: it.os, cliente: it.cliente, contrato: it.contrato,
+        endereco: it.endereco, tipo: it.tipo, periodo: it.periodo,
+        lat: it.lat, lon: it.lon,
+        reincidencia: it.total>1 ? {ocorrencias: it.total, datas_anteriores: it.anteriores.map(a=>a.d)} : null
+      }))
+    })),
+    sem_localizacao: itens.filter(it=>!it.lat).map(it=>({os:it.os, cliente:it.cliente, endereco:it.endereco}))
+  };
+  baixar('plano-despacho-'+plano.data+'.json', JSON.stringify(plano,null,2), 'application/json');
+}
+
+function baixar(nome, conteudo, tipo){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([conteudo],{type:tipo}));
+  a.download = nome; a.click(); URL.revokeObjectURL(a.href);
+}
+function exportarCsv(){
+  if(!itens.length) return;
+  const cab = ['Equipe','Parada','OS','Cliente','Endereco','Tipo','Periodo','Ocorrencias','Latitude','Longitude'];
+  const linhas = itens.slice().sort((a,b)=>(a.equipe-b.equipe)||(a.ordem-b.ordem)).map(it=>[
+    (it.equipe??'')===''?'':nomeEquipe(it.equipe), it.ordem||'', it.os, it.cliente, it.endereco, it.tipo, it.periodo,
+    it.total>1? it.total+'x em '+cfg.janela+' dias':'', it.lat??'', it.lon??''
+  ]);
+  const csv = '\ufeff' + [cab,...linhas].map(l=>l.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');
+  baixar('distribuicao-'+$('#dia').value+'.csv', csv, 'text/csv;charset=utf-8');
+}
+
+/* ---------- eventos ---------- */
+document.querySelectorAll('[data-sec]>h2').forEach(h => h.onclick = ()=> h.parentElement.classList.toggle('open'));
+$('#btnMenu').onclick = ()=> $('#painel').classList.toggle('show');
+function fecharPainel(){ if(innerWidth<=820) $('#painel').classList.remove('show'); }
+
+const drop = $('#drop');
+drop.onclick = ()=> $('#file').click();
+drop.onkeydown = e => { if(e.key==='Enter'||e.key===' ') $('#file').click(); };
+['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=> drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) lerArquivo(f); });
+$('#file').onchange = e => { const f=e.target.files[0]; if(f) lerArquivo(f); };
+
+$('#btnRemap').onclick = ()=>{
+  document.querySelectorAll('#mapCols select').forEach(s=>{ if(s.value) cfg.cols[s.dataset.campo]=s.value; else delete cfg.cols[s.dataset.campo]; });
+  Base.set(K_CFG,cfg);
+  $('#statusImp').textContent = 'Colunas salvas. Carregue a planilha novamente para aplicar.';
+};
+$('#btnRecalc').onclick = async ()=>{
+  lerConfig(); await Base.set(K_CFG,cfg);
+  analisarReincidencia(); montarRotas(); desenharTudo();
+};
+$('#btnBase').onclick = ()=>{
+  fecharPainel(); modo('Toque no mapa para marcar o ponto de partida das equipes');
+  cliqueMapa = async ll => { cfg.base=[ll.lat,ll.lng]; await Base.set(K_CFG,cfg); montarRotas(); desenharTudo(); };
+};
+$('#btnDemo').onclick = carregarExemplo;
+$('#btnExpCsv').onclick = exportarCsv;
+$('#btnExpPlano').onclick = exportarPlano;
+$('#btnExpBase').onclick = ()=> baixar('mapa-os-base.json', JSON.stringify({historico, cacheGeo, cfg}), 'application/json');
+$('#btnImpBase').onclick = ()=> $('#fileBase').click();
+$('#fileBase').onchange = async e => {
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    historico = j.historico||{}; cacheGeo = j.cacheGeo||{}; cfg = Object.assign(cfg, j.cfg||{});
+    await Base.set(K_HIST,historico); await Base.set(K_GEO,cacheGeo); await Base.set(K_CFG,cfg);
+    escreverConfig(); atualizarPaineis();
+    $('#statusImp').textContent = 'Base restaurada: ' + Object.keys(historico).length + ' dias.';
+  }catch(err){ $('#statusImp').textContent = 'Não consegui ler esse arquivo de base.'; }
+};
+['#cfgCidade','#cfgChave','#cfgJanela','#cfgEquipes','#dia'].forEach(s=> $(s).onchange = ()=>{ lerConfig(); Base.set(K_CFG,cfg); });
+
+function lerConfig(){
+  const antes = cfg.equipes;
+  cfg.cidade = $('#cfgCidade').value.trim();
+  cfg.chave = $('#cfgChave').value;
+  cfg.janela = +$('#cfgJanela').value;
+  cfg.equipes = +$('#cfgEquipes').value;
+  if(cfg.equipes !== antes) desenharNomes();
+}
+function escreverConfig(){
+  $('#cfgCidade').value = cfg.cidade||'';
+  $('#cfgChave').value = cfg.chave||'endereco';
+  $('#cfgJanela').value = cfg.janela||7;
+  $('#cfgEquipes').value = cfg.equipes||3;
+  desenharNomes();
+}
+
+/* ---------- início ---------- */
+(async function(){
+  iniciarMapa();
+  $('#dia').value = hoje();
+  const [h,g,c] = await Promise.all([Base.get(K_HIST), Base.get(K_GEO), Base.get(K_CFG)]);
+  historico = h || {}; cacheGeo = g || {}; if(c) cfg = Object.assign(cfg,c);
+  escreverConfig();
+  if(cfg.base) camadas.base = L.marker(cfg.base,{icon:L.divIcon({className:'',iconSize:[16,16],iconAnchor:[8,8],html:'<div class="pin base" style="width:16px;height:16px;transform:none"></div>'})}).addTo(mapa);
+  atualizarPaineis();
+})();
+</script>
+</body>
+</html>
