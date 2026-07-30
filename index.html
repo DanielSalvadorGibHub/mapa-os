@@ -129,6 +129,7 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
     <div class="chip"><b id="sTotal">0</b><span>OS</span></div>
     <div class="chip"><b id="sPlot">0</b><span>no mapa</span></div>
     <div class="chip warn"><b id="sRein">0</b><span>reincidentes</span></div>
+    <div class="chip warn"><b id="sAprox">0</b><span>aproximados</span></div>
     <div class="chip bad"><b id="sFalha">0</b><span>sem endereço</span></div>
   </div>
 </header>
@@ -149,6 +150,7 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
       <input type="date" id="dia">
       <div class="bar"><i id="prog"></i></div>
       <p class="hint" id="statusImp">Nenhum arquivo carregado.</p>
+      <div class="row"><button class="btn ghost" id="btnRegeo">Refazer localização</button></div>
       <button class="btn ghost" id="btnDemo" style="margin-top:4px">Ver com dados de exemplo</button>
     </div>
   </section>
@@ -167,8 +169,17 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
   <section class="sec" data-sec>
     <h2>Regras</h2>
     <div class="body">
+      <label class="f">Chave do Google Maps (opcional, fica só neste navegador)</label>
+      <input type="text" id="cfgGoogle" placeholder="AIza…" autocomplete="off">
+      <p class="hint">Sem chave, a busca usa OpenStreetMap conferido pelo CEP. Com chave, a precisão é a mesma do My Maps.</p>
       <label class="f">Cidade / UF padrão (completa endereços incompletos)</label>
-      <input type="text" id="cfgCidade" placeholder="Ex.: Palmas, TO">
+      <input type="text" id="cfgCidade" placeholder="Ex.: Pinhais, PR">
+      <label class="f">Divisão dos atendimentos</label>
+      <select id="cfgDivisao">
+        <option value="tecnicos">entre os técnicos disponíveis no dia</option>
+        <option value="auto">em N grupos por região</option>
+        <option value="coluna">usar o técnico que vem no relatório</option>
+      </select>
       <label class="f">Considerar reincidência quando repetir</label>
       <div class="grid2">
         <select id="cfgChave">
@@ -183,11 +194,23 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
         </select>
       </div>
       <div class="grid2" style="margin-top:9px">
-        <div><label class="f">Equipes</label><input type="number" id="cfgEquipes" min="1" max="8" value="3"></div>
-        <div><label class="f">Ponto de partida</label><button class="btn ghost" id="btnBase">Marcar no mapa</button></div>
+        <div><label class="f">Grupos (modo N por região)</label><input type="number" id="cfgEquipes" min="1" max="10" value="3"></div>
+        <div><label class="f">Teto de OS por técnico</label><input type="number" id="cfgLimite" min="1" max="30" value="8"></div>
       </div>
       <div id="nomesEquipes"></div>
+      <label class="f">Ponto de partida das rotas</label>
+      <button class="btn ghost" id="btnBase">Marcar no mapa</button>
       <button class="btn" id="btnRecalc" style="margin-top:12px">Recalcular rotas</button>
+    </div>
+  </section>
+
+  <!-- 3b. técnicos -->
+  <section class="sec" data-sec>
+    <h2>Técnicos <span class="cnt" id="cntTec"></span></h2>
+    <div class="body">
+      <div id="listaTec"></div>
+      <button class="btn ghost" id="btnAddTec" style="margin-top:8px">Adicionar técnico</button>
+      <p class="hint">Quem está de 12x36 precisa de uma data em que trabalhou — a partir dela a escala é calculada dia sim, dia não.</p>
     </div>
   </section>
 
@@ -205,8 +228,15 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
 
   <!-- 6. pendencias -->
   <section class="sec" data-sec>
-    <h2>Sem localização <span class="cnt" id="cntFalha"></span></h2>
-    <div class="body"><div id="listaFalha"><p class="hint">Nenhuma pendência.</p></div></div>
+    <h2>Revisar no mapa <span class="cnt" id="cntFalha"></span></h2>
+    <div class="body">
+      <div id="listaFalha"><p class="hint">Nenhuma pendência.</p></div>
+      <p class="hint" style="margin-top:12px;color:#DCEFEF">Trazer as coordenadas do My Maps</p>
+      <div class="row"><button class="btn ghost" id="btnParaMyMaps">1. Baixar endereços (CSV)</button></div>
+      <div class="row"><button class="btn ghost" id="btnDoMyMaps">2. Carregar KML do My Maps</button></div>
+      <input type="file" id="fileKml" accept=".kml" hidden>
+      <p class="hint">Importe o CSV no My Maps, exporte a camada como KML e traga de volta aqui. As coordenadas ficam salvas e valem para todos os dias seguintes.</p>
+    </div>
   </section>
 
   <!-- 7. base -->
@@ -241,7 +271,8 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
    MAPA OS — plotagem e distribuição diária de ordens de serviço
    ============================================================ */
 
-const CORES = ['#2AE0C0','#3FB6F0','#FFB547','#9A7BFF','#FF7BB0','#A8E05F','#FF8A47','#6C8CFF'];
+const CORES = ['#2AE0C0','#3FB6F0','#FFB547','#9A7BFF','#FF7BB0','#A8E05F','#FF8A47','#6C8CFF','#E8D24A','#5FD3A8'];
+let avisosDist = [];
 const $ = s => document.querySelector(s);
 
 /* ---------- armazenamento ----------
@@ -265,7 +296,7 @@ const Base = {
 const K_HIST='mapaos:historico', K_GEO='mapaos:enderecos', K_CFG='mapaos:config';
 
 /* ---------- estado ---------- */
-let cfg = {cols:{}, cidade:'', chave:'endereco', janela:7, equipes:3, base:null};
+let cfg = {cols:{}, cidade:'', chave:'endereco', janela:7, equipes:3, base:null, divisao:'tecnicos', limiteOS:8};
 let historico = {};   // 'AAAA-MM-DD' -> [{k, endereco, cliente, os, tipo}]
 let cacheGeo = {};    // endereço normalizado -> [lat, lon]
 let itens = [];       // OS do dia
@@ -319,8 +350,9 @@ async function lerArquivo(file){
     if(n>melhor){melhor=n;li=i;}
   }
   const cab = aoa[li].map((h,i)=> String(h).trim() || ('coluna_'+(i+1)));
+  const vazia = v => { const t=String(v??'').trim(); return t==='' || t==='-' || t.toUpperCase()==='N/A'; };
   const linhas = aoa.slice(li+1)
-    .filter(r=>r.some(v=>String(v).trim()!==''))
+    .filter(r=>r.filter(v=>!vazia(v)).length > 2)      // descarta linhas de rodapé/separador
     .map(r=>{ const o={}; cab.forEach((h,i)=> o[h]=String(r[i]??'').trim()); return o; });
 
   colunasArquivo = cab;
@@ -331,29 +363,32 @@ async function lerArquivo(file){
 
 /* ---------- detecção de colunas ---------- */
 const CAMPOS = [
-  ['endereco','Endereço / logradouro',['endereco','logradouro','rua','end','local','localizacao']],
-  ['numero','Número',['numero','num','nº','n°','nro']],
-  ['bairro','Bairro',['bairro','setor','quadra']],
-  ['cidade','Cidade',['cidade','municipio','localidade']],
-  ['uf','UF',['uf','estado']],
-  ['cep','CEP',['cep','codigo postal']],
-  ['cliente','Cliente',['cliente','nome','assinante','razao social','razao']],
-  ['os','Nº da OS',['os','ordem','ordem de servico','protocolo','chamado','codigo','id']],
-  ['contrato','Contrato',['contrato','codigo cliente','id cliente','cod cliente']],
-  ['tipo','Tipo de serviço',['tipo','servico','motivo','assunto','descricao','categoria']],
-  ['tecnico','Técnico / equipe',['tecnico','equipe','responsavel','atendente','executor']],
-  ['periodo','Período',['periodo','turno','horario','hora','agendamento','agendado']],
-  ['lat','Latitude',['lat','latitude']],
-  ['lon','Longitude',['lon','lng','long','longitude']]
+  ['endereco','Endereço completo',['endereco instalacao','endereco','logradouro','rua','end','local'],false],
+  ['numero','Número (se vier separado)',['numero','num','nº','n°','nro'],true],
+  ['bairro','Bairro',['bairro'],true],
+  ['cidade','Cidade',['cidade','municipio','localidade'],true],
+  ['uf','UF',['uf','estado'],true],
+  ['cep','CEP',['cep','codigo postal'],true],
+  ['cliente','Cliente',['cliente','nome','assinante','razao social'],false],
+  ['os','Nº da OS',['num o s','num os','numero os','os','ordem servico','ordem','protocolo','chamado'],false],
+  ['contrato','Contrato / serviço',['numero servico','contrato','codigo cliente','cod cliente','id cliente'],false],
+  ['tipo','Tipo de serviço',['tipo','servico','motivo','assunto','categoria'],false],
+  ['tecnico','Técnico',['tecnicos','tecnico','equipe','responsavel','executor'],false],
+  ['data','Data programada',['data inicio programado','data programada','data agendamento','data'],false],
+  ['periodo','Horário',['hora inicio programado','hora programada','horario','hora','periodo','turno'],false],
+  ['obs','Descrição / observações',['descricao servico','descricao','observacao','obs'],false],
+  ['lat','Latitude',['lat','latitude'],true],
+  ['lon','Longitude',['lon','lng','long','longitude'],true]
 ];
 
 function detectarColunas(cab){
   const salvo = cfg.cols || {};
   const achou = {};
-  CAMPOS.forEach(([campo,,chaves])=>{
+  CAMPOS.forEach(([campo,,chaves,estrito])=>{
     if(salvo[campo] && cab.includes(salvo[campo])){ achou[campo]=salvo[campo]; return; }
     const exato = cab.find(h => chaves.includes(norm(h)));
     if(exato){ achou[campo]=exato; return; }
+    if(estrito) return;                       // evita casar "numero" com "numero_servico"
     const parcial = cab.find(h => chaves.some(c => norm(h).includes(c)));
     if(parcial) achou[campo]=parcial;
   });
@@ -374,6 +409,38 @@ function desenharMapeamento(){
 }
 
 /* ---------- montagem dos itens ---------- */
+/* Endereço do HubSoft vem num campo só:
+   LOGRADOURO, NUM[, COMPLEMENTO] - BAIRRO, CIDADE/UF | CEP: 00000-000        */
+function separarEndereco(bruto){
+  const p = {logradouro:'',numero:'',bairro:'',cidade:'',uf:'',cep:'',vazio:false};
+  let t = String(bruto||'').trim();
+  if(!t) { p.vazio = true; return p; }
+  const mcep = t.match(/CEP:\s*(\d{5}-?\d{3})/i);
+  if(mcep) p.cep = mcep[1];
+  t = t.split('|')[0].trim().replace(/,\s*$/,'');
+  if(/^S\/END|^N\/A|^SEM ENDERE/i.test(t)){ p.vazio = true; return p; }
+
+  const corte = t.lastIndexOf(' - ');
+  let via = t, resto = '';
+  if(corte > 0){ via = t.slice(0,corte).trim(); resto = t.slice(corte+3).trim(); }
+
+  // "RODOVIA X - DE 12637 AO FIM - LADO ÍMPAR, 12813" → tira a faixa dos Correios
+  via = via.replace(/\s+-\s+(DE|ATE|ATÉ|LADO)\b[^,]*/gi,'');
+  const partes = via.split(',').map(x=>x.trim()).filter(Boolean);
+  p.logradouro = partes[0] || '';
+  if(partes[1] && /^\d+[A-Za-z]?$/.test(partes[1])) p.numero = partes[1];   // resto é complemento
+
+  const rp = resto.split(',').map(x=>x.trim()).filter(Boolean);
+  if(rp.length){
+    const ult = rp[rp.length-1];
+    const mc = ult.match(/^(.*?)\s*\/\s*([A-Za-z]{2})$/);
+    if(mc){ p.cidade = mc[1]; p.uf = mc[2].toUpperCase(); rp.pop(); }
+    p.bairro = rp.join(', ');
+  }
+  if(!p.logradouro && !p.cidade) p.vazio = true;
+  return p;
+}
+
 function montarEndereco(l){
   const c = cfg.cols, p = [];
   const rua = l[c.endereco]||'';
@@ -387,6 +454,19 @@ function montarEndereco(l){
   return p.join(', ').replace(/\s+/g,' ').trim();
 }
 
+/* o horário programado é só ordem de fila; a janela real vem escrita na descrição */
+function janelaPedida(txt){
+  const t = semAcento(String(txt||'')).toUpperCase();
+  const r = [];
+  if(/\bMANHA\b/.test(t)) r.push('manhã');
+  if(/\bTARDE\b/.test(t)) r.push('tarde');
+  const apos = t.match(/APOS\s+A?S?\s*(\d{1,2})/);
+  const ate  = t.match(/ATE\s+A?S?\s*(\d{1,2})/);
+  if(apos) r.push('após ' + apos[1] + 'h');
+  if(ate)  r.push('até ' + ate[1] + 'h');
+  return r.slice(0,2).join(' · ');
+}
+
 function chaveOcorrencia(it){
   if(cfg.chave==='cliente') return 'c:'+norm(it.cliente);
   if(cfg.chave==='contrato') return 'k:'+norm(it.contrato||it.os);
@@ -395,6 +475,13 @@ function chaveOcorrencia(it){
 
 async function processar(linhas){
   const c = cfg.cols;
+  // a data da agenda vem do próprio relatório
+  if(c.data){
+    const cont = {};
+    linhas.forEach(l=>{ const m=String(l[c.data]||'').match(/(\d{2})\/(\d{2})\/(\d{4})/); if(m) { const k=m[3]+'-'+m[2]+'-'+m[1]; cont[k]=(cont[k]||0)+1; } });
+    const maior = Object.entries(cont).sort((a,b)=>b[1]-a[1])[0];
+    if(maior) $('#dia').value = maior[0];
+  }
   itens = linhas.map((l,i)=>{
     const it = {
       idx:i,
@@ -409,11 +496,18 @@ async function processar(linhas){
     };
     if(c.lat && c.lon){
       const la = parseFloat(String(l[c.lat]).replace(',','.')), lo = parseFloat(String(l[c.lon]).replace(',','.'));
-      if(!isNaN(la) && !isNaN(lo)){ it.lat=la; it.lon=lo; }
+      if(!isNaN(la) && !isNaN(lo)){ it.lat=la; it.lon=lo; it.fixo=true; it.precisao='exata'; }
     }
+    it.tipo = it.tipo.replace(/[^\x20-\x7EÀ-ÿ]/g,'').replace(/^[|\s-]+/,'').trim();
+    const mcod = it.cliente.match(/^\((\d+)\)\s*(.*)$/);
+    if(mcod){ it.codCliente = mcod[1]; it.cliente = mcod[2]; }
+    if(!it.contrato && it.codCliente) it.contrato = it.codCliente;
+    it.janela = c.obs ? janelaPedida(l[c.obs]) : '';
+    it.partes = separarEndereco(it.endereco);
+    it.semEndereco = it.partes.vazio && !it.lat;
     it.k = chaveOcorrencia(it);
     return it;
-  }).filter(it => it.endereco || it.lat);
+  });
 
   $('#statusImp').textContent = itens.length + ' OS lidas. Localizando endereços…';
   await geocodificarTodos();
@@ -422,34 +516,136 @@ async function processar(linhas){
   montarRotas();
   desenharTudo();
   await Base.set(K_CFG, cfg);
-  $('#statusImp').textContent = itens.length + ' OS carregadas em ' + brDate($('#dia').value) + '.';
+  $('#statusImp').textContent = itens.length + ' OS em ' + brDate($('#dia').value) + '. ' + ultimoResumo;
 }
 
 /* ---------- geocodificação (OpenStreetMap / Nominatim) ---------- */
+/* ============================================================
+   Localização dos endereços
+   1. Google (se houver chave) — precisão de porta
+   2. Nominatim em consulta estruturada, conferido contra o CEP
+   3. CEP pelo BrasilAPI — precisão de rua, sem cadastro
+   ============================================================ */
+const distKm = (a,b)=> Math.hypot((a[0]-b[0])*111, (a[1]-b[1])*111*Math.cos(a[0]*Math.PI/180));
+const espera = ms => new Promise(r=>setTimeout(r,ms));
+
+/* ----- Google ----- */
+let googlePronto = null;
+window.gm_authFailure = ()=> aviso('O Google recusou a chave. Confira se a Maps JavaScript API está habilitada, se o faturamento está ativo e se este endereço está na lista de referenciadores permitidos.');
+function carregarGoogle(chave){
+  if(googlePronto) return googlePronto;
+  googlePronto = new Promise((ok,erro)=>{
+    if(window.google && google.maps && google.maps.Geocoder) return ok(true);
+    const cb = 'gmapsPronto' + Date.now();
+    window[cb] = ()=> ok(true);
+    const sc = document.createElement('script');
+    sc.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(chave) + '&callback=' + cb;
+    sc.onerror = ()=> erro(new Error('falha ao carregar o Google Maps'));
+    document.head.append(sc);
+  });
+  return googlePronto;
+}
+const PREC_GOOGLE = {ROOFTOP:'exata', RANGE_INTERPOLATED:'exata', GEOMETRIC_CENTER:'rua', APPROXIMATE:'bairro'};
+
+function buscarGoogle(it){
+  const p = it.partes || {};
+  const texto = [p.logradouro && p.numero ? p.logradouro+', '+p.numero : p.logradouro,
+                 p.bairro, p.cidade, p.uf, p.cep].filter(Boolean).join(', ') + ', Brasil';
+  return new Promise(ok=>{
+    new google.maps.Geocoder().geocode({address:texto, region:'br'}, (res, status)=>{
+      if(status !== 'OK' || !res || !res[0]) return ok(null);
+      const g = res[0], loc = g.geometry.location;
+      let prec = PREC_GOOGLE[g.geometry.location_type] || 'aproximada';
+      if(g.partial_match && prec === 'exata') prec = 'rua';
+      ok({lat: loc.lat(), lon: loc.lng(), precisao: prec, fonte:'google'});
+    });
+  });
+}
+
+/* ----- Nominatim, consulta estruturada ----- */
+const PREC_OSM = {house:'exata', building:'exata', place:'exata', road:'rua', residential:'rua',
+                  postcode:'CEP', suburb:'bairro', neighbourhood:'bairro', quarter:'bairro'};
+async function buscarOsm(it){
+  const p = it.partes || {};
+  if(!p.logradouro && !p.cidade) return null;
+  const par = new URLSearchParams({format:'jsonv2', limit:'1', countrycodes:'br', addressdetails:'1'});
+  if(p.logradouro) par.set('street', (p.numero ? p.numero + ' ' : '') + p.logradouro);
+  if(p.cidade) par.set('city', p.cidade);
+  if(p.uf) par.set('state', p.uf);
+  const r = await fetch('https://nominatim.openstreetmap.org/search?' + par.toString());
+  const j = await r.json();
+  if(!j || !j[0]) return null;
+  return {lat: parseFloat(j[0].lat), lon: parseFloat(j[0].lon),
+          precisao: PREC_OSM[j[0].addresstype] || 'aproximada', fonte:'osm'};
+}
+
+/* ----- CEP (BrasilAPI) ----- */
+async function buscarCep(cep){
+  if(!cep) return null;
+  const limpo = cep.replace(/\D/g,'');
+  if(limpo.length !== 8) return null;
+  if(cacheGeo['cep:'+limpo]) { const c = cacheGeo['cep:'+limpo]; return c ? {lat:c[0], lon:c[1], precisao:'CEP', fonte:'cep'} : null; }
+  const r = await fetch('https://brasilapi.com.br/api/cep/v2/' + limpo);
+  if(!r.ok) return null;
+  const j = await r.json();
+  const c = j && j.location && j.location.coordinates;
+  if(!c || !c.latitude) return null;
+  const par = [parseFloat(c.latitude), parseFloat(c.longitude)];
+  cacheGeo['cep:'+limpo] = par;
+  return {lat:par[0], lon:par[1], precisao:'CEP', fonte:'cep'};
+}
+
+/* o CEP serve de fiscal: se o OSM cair longe dele, o OSM errou de rua */
+function melhorResultado(osm, cep){
+  if(osm && cep){
+    const longe = distKm([osm.lat,osm.lon],[cep.lat,cep.lon]) > 3;
+    if(longe) return Object.assign({}, cep, {conferido:'osm descartado, longe do CEP'});
+    if(osm.precisao === 'exata' || osm.precisao === 'rua') return osm;
+    return cep;
+  }
+  return osm || cep || null;
+}
+
 async function geocodificarTodos(){
   cancelar = false;
-  const pend = itens.filter(it => !it.lat && it.endereco);
+  const pend = itens.filter(it => !it.lat && !it.semEndereco);
+  const chave = (cfg.googleKey||'').trim();
+  let usarGoogle = false;
+  if(chave){
+    try{ await carregarGoogle(chave); usarGoogle = true; }
+    catch(e){ aviso('Não consegui carregar o Google Maps com essa chave. Seguindo pelo OpenStreetMap e pelo CEP.'); }
+  }
   let feitos = 0, falhouRede = 0;
+
   for(const it of pend){
     if(cancelar) break;
-    const chave = norm(it.endereco);
-    if(cacheGeo[chave]){ [it.lat,it.lon] = cacheGeo[chave]; }
-    else{
+    const chaveEnd = norm(it.endereco);
+    const guardado = cacheGeo[chaveEnd];
+    const vencido = guardado && guardado[3] === 'google' && (Date.now() - (guardado[4]||0)) > 30*86400000;
+    if(guardado && !vencido){
+      [it.lat, it.lon, it.precisao, it.fonte] = guardado;
+    } else {
+      let r = null;
       try{
-        const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&q=' + encodeURIComponent(it.endereco);
-        const r = await fetch(url,{headers:{'Accept':'application/json'}});
-        const j = await r.json();
-        if(j && j[0]){
-          it.lat = parseFloat(j[0].lat); it.lon = parseFloat(j[0].lon);
-          cacheGeo[chave] = [it.lat, it.lon];
+        if(usarGoogle){
+          r = await buscarGoogle(it);
+          await espera(120);
+        }
+        if(!r){
+          const [osm, cep] = [await buscarOsm(it).catch(()=>null), await buscarCep((it.partes||{}).cep).catch(()=>null)];
+          r = melhorResultado(osm, cep);
+          await espera(1100);                     // Nominatim: 1 consulta por segundo
         }
       }catch(e){
         if(++falhouRede === 3){
-          aviso('Não consegui consultar o serviço de endereços daqui. Baixe este arquivo e abra no navegador, ou inclua colunas de latitude e longitude na planilha.');
-          break;
+          aviso('Não consegui consultar os serviços de endereço daqui. Abra a página publicada no navegador ou inclua latitude e longitude na planilha.');
+          cancelar = true;
         }
       }
-      await new Promise(r=>setTimeout(r,1100)); // limite de 1 consulta por segundo
+      if(r){
+        it.lat = r.lat; it.lon = r.lon; it.precisao = r.precisao; it.fonte = r.fonte;
+        cacheGeo[chaveEnd] = [r.lat, r.lon, r.precisao, r.fonte, Date.now()];
+      }
     }
     feitos++;
     $('#prog').style.width = Math.round(feitos/pend.length*100)+'%';
@@ -457,7 +653,15 @@ async function geocodificarTodos(){
   }
   $('#prog').style.width='0';
   await Base.set(K_GEO, cacheGeo);
+
+  const porFonte = {};
+  itens.filter(i=>i.lat).forEach(i => porFonte[i.fonte||'planilha'] = (porFonte[i.fonte||'planilha']||0) + 1);
+  const exatos = itens.filter(i=>i.precisao==='exata').length;
+  const rotulo = {google:'Google', osm:'OpenStreetMap', cep:'CEP', mymaps:'My Maps', manual:'ajuste manual', planilha:'planilha'};
+  ultimoResumo = exatos + ' de ' + itens.filter(i=>i.lat).length + ' na porta certa · ' +
+    Object.entries(porFonte).map(([f,n]) => n + ' por ' + (rotulo[f]||f)).join(', ');
 }
+let ultimoResumo = '';
 
 /* ---------- reincidência ---------- */
 function analisarReincidencia(){
@@ -494,22 +698,44 @@ async function salvarDia(){
 /* ---------- divisão por equipes + ordem de visita ---------- */
 function montarRotas(){
   const pts = itens.filter(it=>it.lat);
-  const k = Math.max(1, Math.min(cfg.equipes|0 || 1, 8));
   if(!pts.length) return;
+  avisosDist = [];
 
-  // k-means simples
+  if(cfg.divisao === 'coluna' && cfg.cols.tecnico){
+    const nome = it => (it.tecnico||'').trim() || 'Sem técnico';
+    const nomes = [...new Set(pts.map(nome))].sort();
+    pts.forEach(it => it.equipe = nomes.indexOf(nome(it)));
+    cfg.nomes = nomes.slice(); cfg.equipes = nomes.length;
+    desenharNomes(); ordenarVisitas(pts, nomes.length);
+    return;
+  }
+
+  if(cfg.divisao === 'tecnicos' && (cfg.tecnicos||[]).length){
+    distribuirEntreTecnicos(pts);
+    return;
+  }
+
+  const k = Math.max(1, Math.min(cfg.equipes|0 || 1, 10));
+  agruparPorRegiao(pts, k).forEach((g,i)=> g.forEach(p => p.equipe = i));
+  desenharNomes();
+  ordenarVisitas(pts, k);
+}
+
+/* k-means com carga equilibrada; devolve os grupos, sem mexer em it.equipe */
+function agruparPorRegiao(pts, k){
+  k = Math.max(1, Math.min(k, pts.length));
   let centros = [];
   const passo = Math.max(1, Math.floor(pts.length/k));
   for(let i=0;i<k;i++){ const p = pts[Math.min(i*passo, pts.length-1)]; centros.push([p.lat,p.lon]); }
-  for(let it=0; it<40; it++){
+  for(let volta=0; volta<40; volta++){
     pts.forEach(p=>{
       let melhor=0, dm=Infinity;
       centros.forEach((c,i)=>{ const d=(p.lat-c[0])**2+(p.lon-c[1])**2; if(d<dm){dm=d;melhor=i;} });
-      p.equipe = melhor;
+      p._g = melhor;
     });
     let mudou=false;
     centros = centros.map((c,i)=>{
-      const g = pts.filter(p=>p.equipe===i);
+      const g = pts.filter(p=>p._g===i);
       if(!g.length) return c;
       const nc = [g.reduce((s,p)=>s+p.lat,0)/g.length, g.reduce((s,p)=>s+p.lon,0)/g.length];
       if(Math.abs(nc[0]-c[0])>1e-7||Math.abs(nc[1]-c[1])>1e-7) mudou=true;
@@ -517,22 +743,93 @@ function montarRotas(){
     });
     if(!mudou) break;
   }
-
-  // equilibra a carga entre as equipes
   const teto = Math.ceil(pts.length/k);
-  for(let volta=0; volta<60; volta++){
-    const grupos = centros.map((_,i)=>pts.filter(p=>p.equipe===i));
+  for(let volta=0; volta<200; volta++){
+    const grupos = centros.map((_,i)=>pts.filter(p=>p._g===i));
     const cheio = grupos.findIndex(g=>g.length>teto);
     if(cheio<0) break;
-    const g = grupos[cheio];
-    const c = centros[cheio];
+    const g = grupos[cheio], c = centros[cheio];
     g.sort((a,b)=> ((b.lat-c[0])**2+(b.lon-c[1])**2) - ((a.lat-c[0])**2+(a.lon-c[1])**2));
     const alvo = grupos.map((gr,i)=>({i, n:gr.length})).filter(o=>o.n<teto).sort((a,b)=>a.n-b.n)[0];
     if(!alvo) break;
-    g[0].equipe = alvo.i;
+    g[0]._g = alvo.i;
   }
+  const grupos = [];
+  for(let i=0;i<k;i++) grupos.push(pts.filter(p=>p._g===i));
+  return grupos;
+}
 
-  // ordem de visita: vizinho mais próximo a partir da base, depois refino 2-opt
+/* ---------- escala e especialidade ---------- */
+function tecnicosDoDia(dia){
+  const d = new Date(dia+'T12:00:00'), dow = d.getDay();   // 0 = domingo
+  return (cfg.tecnicos||[]).filter(t=>{
+    if(t.ativo === false) return false;
+    if((t.folgas||[]).includes(dia)) return false;
+    if(t.escala === '12x36'){
+      if(!t.ref) return true;                              // escala ainda não definida
+      const dias = Math.round((d - new Date(t.ref+'T12:00:00')) / 86400000);
+      return Math.abs(dias) % 2 === 0;
+    }
+    if(t.escala === 'seg-sex') return dow >= 1 && dow <= 5;
+    return dow >= 1 && dow <= 6;                           // seg-sáb
+  });
+}
+
+function especialidadeDe(tipo){
+  const t = norm(tipo);
+  if(cfg.tipos && cfg.tipos[tipo]) return cfg.tipos[tipo];
+  if(/preventivo|infra|rede|poste|cabo|corretiva/.test(t)) return 'infraestrutura';
+  if(/adesao|instala|ativa|mudanca|reativa/.test(t))       return 'instalacao';
+  if(/comercial|venda|upgrade/.test(t))                    return 'comercial';
+  return 'suporte';
+}
+
+function distribuirEntreTecnicos(pts){
+  const dia = $('#dia').value;
+  const disp = tecnicosDoDia(dia);
+  if(!disp.length){
+    avisosDist.push('Nenhum técnico disponível em ' + brDate(dia) + '. Confira escalas e folgas.');
+    agruparPorRegiao(pts, Math.max(1,cfg.equipes||3)).forEach((g,i)=> g.forEach(p=>p.equipe=i));
+    desenharNomes(); ordenarVisitas(pts, Math.max(1,cfg.equipes||3));
+    return;
+  }
+  cfg.nomes = disp.map(t=>t.nome);
+  cfg.equipes = disp.length;
+
+  const limite = cfg.limiteOS || 8;
+  const porEsp = {};
+  pts.forEach(it=>{ it.esp = especialidadeDe(it.tipo); (porEsp[it.esp] = porEsp[it.esp]||[]).push(it); });
+
+  const usados = new Set();
+  Object.entries(porEsp).forEach(([esp, lista])=>{
+    let pool = disp.filter(t => t.funcao === esp);
+    const reforco = disp.filter(t => t.secundaria === esp && !pool.includes(t));
+    while(pool.length * limite < lista.length && reforco.length) pool.push(reforco.shift());
+    if(!pool.length){
+      pool = disp.filter(t => t.secundaria === esp);
+      if(!pool.length){
+        pool = disp.slice();
+        avisosDist.push('Nenhum técnico de ' + esp + ' hoje — ' + lista.length + ' OS foram divididas entre todos.');
+      }
+    }
+    pool.forEach(t=>usados.add(t.nome));
+    agruparPorRegiao(lista, pool.length).forEach((g,i)=>{
+      const t = pool[Math.min(i, pool.length-1)];
+      g.forEach(it => it.equipe = disp.indexOf(t));
+    });
+    if(lista.length > pool.length * limite)
+      avisosDist.push(esp + ': ' + lista.length + ' OS para ' + pool.length + ' técnico(s) — acima de ' + limite + ' por pessoa.');
+  });
+
+  const ociosos = disp.filter(t=>!usados.has(t.nome)).map(t=>t.nome);
+  if(ociosos.length) avisosDist.push('Sem OS para: ' + ociosos.join(', ') + '.');
+
+  desenharNomes();
+  ordenarVisitas(pts, disp.length);
+}
+
+/* ordem das paradas: vizinho mais próximo a partir da base, depois refino 2-opt */
+function ordenarVisitas(pts, k){
   const dist = (a,b)=> Math.hypot((a.lat-b.lat)*111, (a.lon-b.lon)*111*Math.cos(a.lat*Math.PI/180));
   for(let i=0;i<k;i++){
     let restam = pts.filter(p=>p.equipe===i);
@@ -610,8 +907,10 @@ function popup(it){
   h.push(`<h4>OS ${esc(it.os)}</h4>`);
   if(it.cliente) h.push(`<div>${esc(it.cliente)}</div>`);
   h.push(`<div class="k" style="margin-top:6px">Endereço</div><div>${esc(it.endereco)}</div>`);
+  if(it.precisao && it.precisao!=='exata')
+    h.push(`<div style="color:#FFB547;font-size:11.5px;margin-top:3px">Ponto aproximado (localizado por ${esc(it.precisao)})</div>`);
   if(it.tipo) h.push(`<div class="k" style="margin-top:6px">Serviço</div><div>${esc(it.tipo)}</div>`);
-  if(it.periodo) h.push(`<div class="k" style="margin-top:6px">Período</div><div>${esc(it.periodo)}</div>`);
+  if(it.janela) h.push(`<div class="k" style="margin-top:6px">Janela pedida</div><div style="color:#3FB6F0">${esc(it.janela)}</div>`);
   h.push(`<div class="k" style="margin-top:6px">Equipe</div><div>${esc(nomeEquipe(it.equipe||0))} · parada ${it.ordem||'-'}</div>`);
   if(it.nivel!=='ok'){
     const datas = it.anteriores.map(a=>brDate(a.d)).join(', ');
@@ -629,14 +928,16 @@ function atualizarPaineis(){
   const comLocal = itens.filter(it=>it.lat);
   const rein = itens.filter(it=>it.nivel!=='ok');
   const falhas = itens.filter(it=>!it.lat);
+  const aprox = itens.filter(it=>it.lat && it.precisao && it.precisao!=='exata');
 
   $('#sTotal').textContent = itens.length;
   $('#sPlot').textContent = comLocal.length;
   $('#sRein').textContent = rein.length;
   $('#sFalha').textContent = falhas.length;
+  $('#sAprox').textContent = aprox.length;
   $('#cntRein').textContent = rein.length || '';
   $('#cntRein').className = 'cnt' + (rein.length?' bad':'');
-  $('#cntFalha').textContent = falhas.length || '';
+  $('#cntFalha').textContent = (falhas.length + aprox.length) || '';
 
   // reincidências
   const lr = $('#listaRein');
@@ -658,8 +959,9 @@ function atualizarPaineis(){
   const eq = [...new Set(comLocal.map(it=>it.equipe||0))].sort();
   $('#cntRotas').textContent = eq.length ? eq.length+' equipes' : '';
   const lrt = $('#listaRotas');
-  if(!eq.length) lrt.innerHTML='<p class="hint">Carregue a planilha para dividir as OS entre as equipes.</p>';
-  else lrt.innerHTML = eq.map(e=>{
+  const cabAvisos = (avisosDist||[]).map(a=>`<div class="alerta" style="cursor:default"><div class="e">${esc(a)}</div></div>`).join('');
+  if(!eq.length) lrt.innerHTML = cabAvisos + '<p class="hint">Carregue a planilha para dividir as OS entre as equipes.</p>';
+  else lrt.innerHTML = cabAvisos + eq.map(e=>{
     const g = comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>a.ordem-b.ordem);
     const alertas = g.filter(it=>it.nivel!=='ok').length;
     const link = linkRota(g);
@@ -667,6 +969,7 @@ function atualizarPaineis(){
       <span class="nome">${esc(nomeEquipe(e))}</span><span class="meta">${g.length} OS${alertas?' · '+alertas+' ⚠':''}</span></summary>
       ${g.map(it=>`<div class="parada" data-os="${esc(it.os)}"><span class="i">${it.ordem}</span>
         <span>${esc(it.cliente||it.endereco)}<br><span style="color:#7CA3A8;font-size:11px">${esc(it.endereco)}</span>
+        ${it.janela?`<br><span style="color:#3FB6F0;font-size:11px">${esc(it.janela)}</span>`:''}
         ${it.nivel!=='ok'?`<br><span class="x">${it.total}ª vez em ${cfg.janela} dias</span>`:''}</span></div>`).join('')}
       <div style="padding:9px 10px;border-top:1px solid #174148"><a href="${link}" target="_blank" rel="noopener" style="color:#2AE0C0;font-size:12px">Abrir rota no Google Maps</a></div>
     </details>`;
@@ -678,16 +981,21 @@ function atualizarPaineis(){
 
   // pendências
   const lf = $('#listaFalha');
-  if(!falhas.length) lf.innerHTML='<p class="hint">Nenhuma pendência.</p>';
-  else lf.innerHTML = falhas.map((it,i)=>`<div class="falha"><b>OS ${esc(it.os)} · ${esc(it.cliente)}</b>${esc(it.endereco)||'<i>sem endereço na planilha</i>'}
-    <button data-i="${it.idx}">marcar no mapa</button></div>`).join('');
+  const cartao = (it, motivo) => `<div class="falha"><b>OS ${esc(it.os)} · ${esc(it.cliente)}</b>${esc(it.endereco)}
+    <span style="color:${it.lat?'#FFB547':'#FF4655'}">${motivo}</span>
+    <button data-i="${it.idx}">marcar no mapa</button></div>`;
+  if(!falhas.length && !aprox.length) lf.innerHTML='<p class="hint">Todos os pontos estão na porta certa.</p>';
+  else lf.innerHTML =
+      falhas.map(it => cartao(it, it.semEndereco ? 'OS sem endereço (infraestrutura)' : 'endereço não localizado')).join('') +
+      aprox.map(it => cartao(it, 'ponto aproximado — localizado por ' + it.precisao)).join('');
   lf.querySelectorAll('.falha button').forEach(b=> b.onclick = ()=>{
     const it = itens.find(x=>x.idx===+b.dataset.i);
     fecharPainel();
     modo('Toque no mapa onde fica: ' + (it.endereco || it.cliente || ('OS '+it.os)));
     cliqueMapa = async ll => {
       it.lat=ll.lat; it.lon=ll.lng;
-      if(it.endereco){ cacheGeo[norm(it.endereco)] = [ll.lat,ll.lng]; await Base.set(K_GEO,cacheGeo); }
+      it.precisao = 'exata'; it.fonte = 'manual';
+      if(it.endereco){ cacheGeo[norm(it.endereco)] = [ll.lat, ll.lng, 'exata', 'manual']; await Base.set(K_GEO,cacheGeo); }
       montarRotas(); desenharTudo();
     };
   });
@@ -722,32 +1030,33 @@ function linkRota(g){
 
 /* ---------- demonstração (dados fictícios) ---------- */
 const DEMO = [
- ['Qd 104 Norte, Alameda 12, Lote 5','Ana Bezerra','48210','Sem sinal','Manhã',-10.1742,-48.3325],
- ['Qd 108 Norte, Alameda 4, Lote 22','Carlos Menezes','48211','Instalação','Manhã',-10.1795,-48.3361],
- ['Qd 106 Norte, Alameda 9, Lote 11','Rita Andrade','48212','Troca de ONU','Tarde',-10.1768,-48.3298],
- ['Qd 110 Norte, Alameda 7, Lote 3','Jonas Prado','48213','Lentidão','Tarde',-10.1821,-48.3340],
- ['Qd 102 Norte, Alameda 3, Lote 18','Marta Siqueira','48214','Mudança de endereço','Manhã',-10.1710,-48.3352],
- ['Qd 112 Norte, Alameda 15, Lote 9','Edson Rocha','48215','Sem sinal','Manhã',-10.1850,-48.3312],
- ['Qd 203 Sul, Alameda 8, Lote 14','Luciana Torres','48216','Instalação','Tarde',-10.2431,-48.3267],
- ['Qd 207 Sul, Alameda 11, Lote 2','Pedro Vilar','48217','Troca de roteador','Manhã',-10.2478,-48.3241],
- ['Qd 205 Sul, Alameda 5, Lote 7','Sandra Lopes','48218','Lentidão','Tarde',-10.2455,-48.3298],
- ['Qd 209 Sul, Alameda 2, Lote 20','Rafael Nunes','48219','Sem sinal','Manhã',-10.2502,-48.3275],
- ['Qd 201 Sul, Alameda 6, Lote 12','Teresa Cardoso','48220','Retirada de equipamento','Tarde',-10.2408,-48.3230],
- ['Rua 12, Qd 4, Lote 30, Taquaralto','Iracema Dias','48221','Instalação','Manhã',-10.2884,-48.3115],
- ['Rua 5, Qd 9, Lote 8, Taquaralto','Gilson Farias','48222','Sem sinal','Tarde',-10.2921,-48.3078],
- ['Rua 20, Qd 2, Lote 17, Taquaralto','Nadia Correia','48223','Troca de ONU','Tarde',-10.2866,-48.3042],
- ['Rua 8, Qd 11, Lote 1, Taquaralto','Otávio Braga','48224','Lentidão','Manhã',-10.2949,-48.3131],
- ['Rua 15, Qd 7, Lote 25, Taquaralto','Fabiana Reis','48225','Instalação','Manhã',-10.2903,-48.3160]
+ ['Rua das Araucárias, 320 - Centro, Pinhais/PR','Cliente Demo 01','48210','SUPORTE','08:00',-25.4438,-49.1925],
+ ['Rua Guaraituba, 155 - Emiliano Perneta, Pinhais/PR','Cliente Demo 02','48211','ADESÃO COM ACEITE','08:30',-25.4482,-49.1968],
+ ['Avenida Camilo di Lellis, 780 - Weissópolis, Pinhais/PR','Cliente Demo 03','48212','TROCA DE EQUIPAMENTO','09:00',-25.4405,-49.1889],
+ ['Rua Ipê Amarelo, 42 - Vargem Grande, Pinhais/PR','Cliente Demo 04','48213','SUPORTE','09:40',-25.4521,-49.1854],
+ ['Rua Bela Vista, 1120 - Estância Pinhais, Pinhais/PR','Cliente Demo 05','48214','REATIVAÇÃO','10:20',-25.4360,-49.1972],
+ ['Rua dos Pinheiros, 66 - Atuba, Pinhais/PR','Cliente Demo 06','48215','SUPORTE','11:00',-25.4290,-49.2018],
+ ['Rua Nossa Senhora do Carmo, 210 - Planta Deodoro, Piraquara/PR','Cliente Demo 07','48216','SUPORTE','08:00',-25.4415,-49.0625],
+ ['Rua das Andorinhas, 89 - Andorinhas, Piraquara/PR','Cliente Demo 08','48217','ADESÃO COM ACEITE','08:40',-25.4478,-49.0692],
+ ['Rua Serra do Mar, 1345 - Guarituba, Piraquara/PR','Cliente Demo 09','48218','TROCA DE EQUIPAMENTO','09:20',-25.4530,-49.0578],
+ ['Rua Planta Wagner, 30 - Planta Wagner, Piraquara/PR','Cliente Demo 10','48219','SUPORTE','10:00',-25.4362,-49.0710],
+ ['Estrada da Roseira, 505 - Roseira, Piraquara/PR','Cliente Demo 11','48220','SUPORTE','10:50',-25.4295,-49.0540],
+ ['Rua João Belarmino, 77 - Maracanã, Colombo/PR','Cliente Demo 12','48221','SUPORTE','08:10',-25.3320,-49.2035],
+ ['Rua Elias Abrahão, 940 - São Gabriel, Colombo/PR','Cliente Demo 13','48222','REATIVAÇÃO','08:50',-25.3401,-49.1978],
+ ['Rua Pedro Zanoni, 15 - Guaraituba, Colombo/PR','Cliente Demo 14','48223','SUPORTE','09:30',-25.3268,-49.2120],
+ ['Avenida dos Estados, 620 - Rio Verde, Colombo/PR','Cliente Demo 15','48224','TROCA DE EQUIPAMENTO','10:10',-25.3475,-49.2088],
+ ['Rua Antônio Zaninelli, 200 - Roça Grande, Colombo/PR','Cliente Demo 16','48225','SUPORTE','11:00',-25.3190,-49.1902]
 ];
 let histReal = null;
 
 function carregarExemplo(){
   if(histReal === null) histReal = historico;
   lerConfig();
+  cfg.divisao='auto'; $('#cfgDivisao').value='auto';
   const dia = $('#dia').value;
   itens = DEMO.map((d,i)=>({
-    idx:i, endereco:d[0]+', Palmas, TO', cliente:d[1], os:d[2], contrato:'', tipo:d[3],
-    tecnico:'', periodo:d[4], lat:d[5], lon:d[6]
+    idx:i, endereco:d[0], cliente:d[1], os:d[2], contrato:'', tipo:d[3],
+    tecnico:'', periodo:d[4], lat:d[5], lon:d[6], precisao:'exata', partes:separarEndereco(d[0])
   }));
   itens.forEach(it => it.k = chaveOcorrencia(it));
 
@@ -772,6 +1081,7 @@ const nomeEquipe = i => (cfg.nomes && cfg.nomes[i]) ? cfg.nomes[i] : 'Equipe ' +
 function desenharNomes(){
   const alvo = $('#nomesEquipes'); alvo.innerHTML='';
   cfg.nomes = cfg.nomes || [];
+  if(cfg.divisao !== 'auto') return;   // nos outros modos os nomes vêm dos técnicos
   const l = document.createElement('label'); l.className='f'; l.textContent='Técnico ou equipe responsável';
   alvo.append(l);
   for(let i=0;i<(cfg.equipes||3);i++){
@@ -782,6 +1092,148 @@ function desenharNomes(){
     inp.onchange = ()=>{ cfg.nomes[i] = inp.value.trim(); Base.set(K_CFG,cfg); atualizarPaineis(); };
     alvo.append(inp);
   }
+}
+
+/* chave para casar o mesmo endereço vindo de fontes diferentes */
+function chaveDeEndereco(txt){
+  const p = separarEndereco(txt);
+  if(!p.logradouro) return null;
+  return norm(p.logradouro) + '|' + (p.numero||'') + '|' + norm(p.cidade||'');
+}
+
+/* formato que o My Maps entende e que a nossa leitura reconhece de volta */
+function enderecoLimpo(it){
+  const p = it.partes || {};
+  const via = p.logradouro + (p.numero ? ', ' + p.numero : '');
+  const fim = [p.bairro, (p.cidade||'') + (p.uf ? '/' + p.uf : '')].filter(x=>x && x!=='/').join(', ');
+  return fim ? via + ' - ' + fim : via;
+}
+
+function exportarParaMyMaps(){
+  const alvo = itens.filter(it => !it.semEndereco && (!it.precisao || it.precisao !== 'exata'));
+  const lista = alvo.length ? alvo : itens.filter(it=>!it.semEndereco);
+  if(!lista.length) return;
+  const linhas = lista.map(it => [enderecoLimpo(it), it.os, it.cliente]);
+  const csv = '\ufeff' + [['endereco','os','cliente'], ...linhas]
+    .map(l => l.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  baixar('enderecos-para-mymaps.csv', csv, 'text/csv;charset=utf-8');
+  $('#statusImp').textContent = lista.length + ' endereços exportados. No My Maps use a coluna "endereco" para posicionar e "os" para o título.';
+}
+
+async function importarKml(file){
+  const doc = new DOMParser().parseFromString(await file.text(), 'text/xml');
+  const marcas = [...doc.getElementsByTagName('Placemark')];
+  if(!marcas.length){ $('#statusImp').textContent = 'Não encontrei pontos nesse KML.'; return; }
+
+  const indice = {};
+  itens.forEach(it => { const k = chaveDeEndereco(it.endereco); if(k) (indice[k] = indice[k] || []).push(it); });
+
+  let casados = 0, soltos = 0;
+  marcas.forEach(m=>{
+    const coord = (m.getElementsByTagName('coordinates')[0]||{}).textContent;
+    if(!coord) return;
+    const [lon, lat] = coord.trim().split(',').map(parseFloat);
+    if(isNaN(lat) || isNaN(lon)) return;
+    const textos = ['address','name'].map(t => (m.getElementsByTagName(t)[0]||{}).textContent).filter(Boolean);
+    let achou = false;
+    textos.forEach(t=>{
+      const k = chaveDeEndereco(t);
+      if(k && indice[k]){
+        indice[k].forEach(it=>{
+          it.lat = lat; it.lon = lon; it.precisao = 'exata'; it.fonte = 'mymaps';
+          cacheGeo[norm(it.endereco)] = [lat, lon, 'exata', 'mymaps'];
+        });
+        achou = true;
+      }
+    });
+    achou ? casados++ : soltos++;
+  });
+
+  await Base.set(K_GEO, cacheGeo);
+  analisarReincidencia(); montarRotas(); desenharTudo();
+  $('#statusImp').textContent = casados + ' pontos aplicados' + (soltos ? ' · ' + soltos + ' não bateram com nenhuma OS' : '') + '.';
+}
+
+/* ---------- técnicos ---------- */
+const SEED = 2;
+const FUNCOES = [['suporte','Suporte'],['instalacao','Instalação'],['infraestrutura','Infraestrutura'],['comercial','Comercial']];
+const EQUIPE_PADRAO = [
+  {nome:'Alan Barbeta Batista',              funcao:'comercial',      escala:'seg-sab', folgas:[]},
+  {nome:'Allysson Allex Kovalski',           funcao:'infraestrutura', secundaria:'suporte', escala:'seg-sab', folgas:[]},
+  {nome:'Diego Batista do Nascimento',       funcao:'instalacao',     escala:'seg-sab', folgas:[]},
+  {nome:'Denis Pereira',                     funcao:'suporte',        escala:'12x36',   ref:'2026-07-31', folgas:[]},
+  {nome:'Gabriel Henrique Oliveira de Melo', funcao:'suporte',        escala:'12x36',   ref:'2026-07-30', folgas:[]},
+  {nome:'Francislaine De Paula',             funcao:'infraestrutura', escala:'seg-sab', folgas:[]},
+  {nome:'Nelson Antonio Moura Pinto Filho',  funcao:'suporte',        escala:'12x36',   ref:'2026-07-31', folgas:[]},
+  {nome:'Nelson Guilherme da Silva',         funcao:'suporte',        escala:'12x36',   ref:'2026-07-31', folgas:[]},
+  {nome:'Marlom de Oliveira',                funcao:'infraestrutura', secundaria:'suporte', escala:'seg-sab', folgas:[]},
+  {nome:'João Claudio Rodrigues',            funcao:'infraestrutura', escala:'seg-sab', folgas:[]}
+];
+
+const paraISO = t => { const m=String(t).trim().match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/); if(!m) return null;
+  const ano = m[3] ? (m[3].length===2 ? '20'+m[3] : m[3]) : ($('#dia').value||hoje()).slice(0,4);
+  return ano+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); };
+
+function proximosDias(t, dia, n=4){
+  const fora = [], d0 = new Date(dia+'T12:00:00');
+  for(let i=0; i<24 && fora.length<n; i++){
+    const d = new Date(d0); d.setDate(d.getDate()+i);
+    const iso = d.toISOString().slice(0,10);
+    if(tecnicosDoDia(iso).some(x=>x.nome===t.nome)) fora.push(brDate(iso));
+  }
+  return fora;
+}
+
+function desenharTecnicos(){
+  const alvo = $('#listaTec'); if(!alvo) return;
+  alvo.innerHTML = '';
+  cfg.tecnicos = cfg.tecnicos || [];
+  const dia = $('#dia').value || hoje();
+  const disp = tecnicosDoDia(dia).map(t=>t.nome);
+  $('#cntTec').textContent = disp.length + '/' + cfg.tecnicos.length;
+
+  cfg.tecnicos.forEach((t,i)=>{
+    const livre = disp.includes(t.nome);
+    const d = document.createElement('details'); d.className='equipe';
+    const funcRot = (FUNCOES.find(f=>f[0]===t.funcao)||['','—'])[1];
+    d.innerHTML = `<summary>
+        <span class="dot" style="background:${livre?CORES[disp.indexOf(t.nome)%CORES.length]:'#2C4A50'}"></span>
+        <span class="nome" style="${livre?'':'color:#7CA3A8'}">${esc(t.nome)}</span>
+        <span class="meta">${funcRot}${livre?'':' · fora'}</span></summary>
+      <div style="padding:9px 10px;border-top:1px solid var(--line)">
+        <label class="f">Nome exatamente como no HubSoft</label><input type="text" data-c="nome" value="${esc(t.nome)}">
+        <div class="grid2" style="margin-top:8px">
+          <div><label class="f">Função</label><select data-c="funcao">${FUNCOES.map(f=>`<option value="${f[0]}"${t.funcao===f[0]?' selected':''}>${f[1]}</option>`).join('')}</select></div>
+          <div><label class="f">Também atende</label><select data-c="secundaria"><option value="">—</option>${FUNCOES.map(f=>`<option value="${f[0]}"${t.secundaria===f[0]?' selected':''}>${f[1]}</option>`).join('')}</select></div>
+        </div>
+        <div class="grid2" style="margin-top:8px">
+          <div><label class="f">Escala</label><select data-c="escala">
+            <option value="seg-sab"${t.escala==='seg-sab'?' selected':''}>Segunda a sábado</option>
+            <option value="seg-sex"${t.escala==='seg-sex'?' selected':''}>Segunda a sexta</option>
+            <option value="12x36"${t.escala==='12x36'?' selected':''}>12x36 (dia sim, dia não)</option></select></div>
+          <div><label class="f">${t.escala==='12x36'?'Trabalhou em':'—'}</label>
+            <input type="date" data-c="ref" value="${t.ref||''}" ${t.escala==='12x36'?'':'disabled'}></div>
+        </div>
+        <label class="f">Folgas (dd/mm, separadas por vírgula)</label>
+        <input type="text" data-c="folgas" value="${(t.folgas||[]).map(brDate).join(', ')}" placeholder="01/08, 15/08">
+        <p class="hint" style="margin-top:8px">${t.escala==='12x36' && !t.ref ? 'Defina uma data em que ele trabalhou para calcular a escala.'
+          : 'Próximos plantões: ' + proximosDias(t, dia).join(' · ')}</p>
+        <div class="row"><button class="btn ghost" data-rm="${i}">Remover</button></div>
+      </div>`;
+
+    d.querySelectorAll('[data-c]').forEach(el=> el.onchange = ()=>{
+      const c = el.dataset.c;
+      if(c === 'folgas') t.folgas = el.value.split(',').map(paraISO).filter(Boolean);
+      else t[c] = el.value;
+      Base.set(K_CFG,cfg); desenharTecnicos();
+      if(itens.length){ montarRotas(); desenharTudo(); }
+    });
+    d.querySelector('[data-rm]').onclick = ()=>{
+      cfg.tecnicos.splice(i,1); Base.set(K_CFG,cfg); desenharTecnicos();
+      if(itens.length){ montarRotas(); desenharTudo(); }
+    };
+    alvo.append(d);
+  });
 }
 
 /* ---------- exportações ---------- */
@@ -798,7 +1250,8 @@ function exportarPlano(){
       nome: nomeEquipe(e),
       paradas: comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>a.ordem-b.ordem).map(it=>({
         ordem: it.ordem, os: it.os, cliente: it.cliente, contrato: it.contrato,
-        endereco: it.endereco, tipo: it.tipo, periodo: it.periodo,
+        endereco: it.endereco, tipo: it.tipo, especialidade: it.esp || '',
+        janela_pedida: it.janela || '', responsavel_atual: it.tecnico || '',
         lat: it.lat, lon: it.lon,
         reincidencia: it.total>1 ? {ocorrencias: it.total, datas_anteriores: it.anteriores.map(a=>a.d)} : null
       }))
@@ -850,7 +1303,27 @@ $('#btnBase').onclick = ()=>{
   fecharPainel(); modo('Toque no mapa para marcar o ponto de partida das equipes');
   cliqueMapa = async ll => { cfg.base=[ll.lat,ll.lng]; await Base.set(K_CFG,cfg); montarRotas(); desenharTudo(); };
 };
+$('#btnRegeo').onclick = async ()=>{
+  if(!itens.length) return;
+  lerConfig();
+  itens.forEach(it=>{
+    if(it.fixo) return;
+    delete cacheGeo[norm(it.endereco)];
+    it.lat = null; it.lon = null; it.precisao = null; it.fonte = null;
+  });
+  await geocodificarTodos();
+  analisarReincidencia(); montarRotas(); desenharTudo();
+  $('#statusImp').textContent = 'Localização refeita. ' + ultimoResumo;
+};
+$('#btnParaMyMaps').onclick = exportarParaMyMaps;
+$('#btnDoMyMaps').onclick = ()=> $('#fileKml').click();
+$('#fileKml').onchange = e => { const f = e.target.files[0]; if(f) importarKml(f); };
 $('#btnDemo').onclick = carregarExemplo;
+$('#btnAddTec').onclick = ()=>{
+  cfg.tecnicos = cfg.tecnicos || [];
+  cfg.tecnicos.push({nome:'Novo técnico', funcao:'suporte', escala:'seg-sab', folgas:[]});
+  Base.set(K_CFG,cfg); desenharTecnicos();
+};
 $('#btnExpCsv').onclick = exportarCsv;
 $('#btnExpPlano').onclick = exportarPlano;
 $('#btnExpBase').onclick = ()=> baixar('mapa-os-base.json', JSON.stringify({historico, cacheGeo, cfg}), 'application/json');
@@ -865,7 +1338,7 @@ $('#fileBase').onchange = async e => {
     $('#statusImp').textContent = 'Base restaurada: ' + Object.keys(historico).length + ' dias.';
   }catch(err){ $('#statusImp').textContent = 'Não consegui ler esse arquivo de base.'; }
 };
-['#cfgCidade','#cfgChave','#cfgJanela','#cfgEquipes','#dia'].forEach(s=> $(s).onchange = ()=>{ lerConfig(); Base.set(K_CFG,cfg); });
+['#cfgCidade','#cfgChave','#cfgJanela','#cfgEquipes','#cfgDivisao','#cfgLimite','#cfgGoogle','#dia'].forEach(s=> $(s).onchange = ()=>{ lerConfig(); Base.set(K_CFG,cfg); });
 
 function lerConfig(){
   const antes = cfg.equipes;
@@ -873,6 +1346,10 @@ function lerConfig(){
   cfg.chave = $('#cfgChave').value;
   cfg.janela = +$('#cfgJanela').value;
   cfg.equipes = +$('#cfgEquipes').value;
+  cfg.divisao = $('#cfgDivisao').value;
+  cfg.limiteOS = +$('#cfgLimite').value || 8;
+  cfg.googleKey = $('#cfgGoogle').value.trim();
+  desenharTecnicos();
   if(cfg.equipes !== antes) desenharNomes();
 }
 function escreverConfig(){
@@ -880,7 +1357,11 @@ function escreverConfig(){
   $('#cfgChave').value = cfg.chave||'endereco';
   $('#cfgJanela').value = cfg.janela||7;
   $('#cfgEquipes').value = cfg.equipes||3;
+  $('#cfgDivisao').value = cfg.divisao||'tecnicos';
+  $('#cfgLimite').value = cfg.limiteOS||8;
+  $('#cfgGoogle').value = cfg.googleKey||'';
   desenharNomes();
+  desenharTecnicos();
 }
 
 /* ---------- início ---------- */
@@ -889,6 +1370,11 @@ function escreverConfig(){
   $('#dia').value = hoje();
   const [h,g,c] = await Promise.all([Base.get(K_HIST), Base.get(K_GEO), Base.get(K_CFG)]);
   historico = h || {}; cacheGeo = g || {}; if(c) cfg = Object.assign(cfg,c);
+  if(!cfg.tecnicos){ cfg.tecnicos = EQUIPE_PADRAO.map(t=>Object.assign({},t)); cfg.seed = SEED; await Base.set(K_CFG,cfg); }
+  else if(cfg.seed !== SEED){
+    EQUIPE_PADRAO.forEach(d=>{ const t = cfg.tecnicos.find(x=>x.nome===d.nome); if(t && d.ref && !t.ref) t.ref = d.ref; });
+    cfg.seed = SEED; await Base.set(K_CFG,cfg);
+  }
   escreverConfig();
   if(cfg.base) camadas.base = L.marker(cfg.base,{icon:L.divIcon({className:'',iconSize:[16,16],iconAnchor:[8,8],html:'<div class="pin base" style="width:16px;height:16px;transform:none"></div>'})}).addTo(mapa);
   atualizarPaineis();
