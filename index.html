@@ -5,118 +5,214 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MAPA OS · Distribuição diária</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
+/* ===========================================================
+   MAPA OS — HUD tático
+   Geometria angular, tipografia condensada, verde Direct.
+   Vermelho é reservado: só reincidência e falha.
+   =========================================================== */
 :root{
-  --bg:#061618; --panel:#0B2327; --panel2:#0F2C31; --line:#174148;
-  --teal:#2AE0C0; --cyan:#3FB6F0; --amber:#FFB547; --alert:#FF4655;
-  --txt:#DCEFEF; --mut:#7CA3A8;
-  --f-disp:'Orbitron',system-ui,sans-serif; --f-txt:'Inter',system-ui,sans-serif; --f-mono:'JetBrains Mono',ui-monospace,monospace;
+  --ink:#070A09; --ink2:#0B100E; --painel:#101614; --painel2:#161F1B;
+  --linha:#233029; --linha2:#19221D;
+  --verde:#50FF54; --verde2:#2FA83A; --verdeEsc:#0C2413;
+  --osso:#ECE8E1; --mut:#7A8C81;
+  --alerta:#FF4655; --alerta2:#BD3944; --ambar:#FFC247;
+  --disp:'Big Shoulders Display',system-ui,sans-serif;
+  --ui:'Barlow',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --corte:10px;
+  --canto:polygon(0 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% 100%, var(--corte) 100%, 0 calc(100% - var(--corte)));
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:var(--f-txt);font-size:14px}
-body{display:flex;flex-direction:column;overflow:hidden}
-button,select,input{font-family:inherit;font-size:13px;color:var(--txt)}
+html,body{margin:0;height:100%;font-family:var(--ui);font-size:14px;color:var(--osso)}
+body{display:flex;flex-direction:column;overflow:hidden;background:var(--ink)}
+button,select,input{font-family:inherit;font-size:13px;color:var(--osso)}
 button{cursor:pointer}
-:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+@keyframes surge{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes varredura{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+@keyframes fluxo{to{stroke-dashoffset:-22}}
+@keyframes pulso{0%{transform:scale(.7);opacity:1}100%{transform:scale(1.6);opacity:0}}
+@keyframes cair{0%{opacity:0;transform:translateY(-14px) rotate(-45deg) scale(.6)}
+                60%{opacity:1;transform:translateY(2px) rotate(-45deg) scale(1.06)}
+                100%{opacity:1;transform:translateY(0) rotate(-45deg) scale(1)}}
+@keyframes flutua{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes piscaBarra{0%,100%{opacity:.35}50%{opacity:1}}
 
 /* ---------- topo ---------- */
-header{display:flex;align-items:center;gap:18px;padding:10px 16px;background:linear-gradient(180deg,#0C2A2F,#081D21);border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap}
-.brand{font-family:var(--f-disp);font-weight:700;letter-spacing:.14em;font-size:15px;color:var(--teal);white-space:nowrap}
-.brand small{display:block;font-family:var(--f-txt);font-weight:400;letter-spacing:.04em;font-size:10px;color:var(--mut);text-transform:uppercase}
-.stats{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
-.chip{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:5px 10px;display:flex;gap:8px;align-items:baseline}
-.chip b{font-family:var(--f-mono);font-size:15px;color:var(--teal)}
-.chip span{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
-.chip.warn b{color:var(--amber)} .chip.bad b{color:var(--alert)}
-#btnMenu{display:none;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:7px 11px}
+header{
+  position:relative;z-index:3;flex:0 0 auto;overflow:hidden;
+  display:flex;align-items:center;gap:20px;padding:9px 16px;flex-wrap:wrap;
+  background:linear-gradient(180deg,#0F1714 0%,#070A09 100%);
+  border-bottom:1px solid var(--linha);
+}
+header::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:linear-gradient(90deg,var(--verde),rgba(80,255,84,0) 55%)}
+/* varredura de scanner */
+header::before{content:'';position:absolute;top:0;bottom:0;width:14%;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(80,255,84,.10),transparent);
+  animation:varredura 7s linear infinite}
+#robo{position:relative;width:46px;height:46px;flex:0 0 auto;border-radius:50%;object-fit:cover;
+  background:radial-gradient(circle at 50% 45%, #10361C, #060B08 72%);
+  box-shadow:0 0 0 1px var(--linha), 0 0 22px rgba(80,255,84,.22);
+  animation:flutua 5s ease-in-out infinite}
+header:hover #robo{box-shadow:0 0 0 1px var(--verde), 0 0 30px rgba(80,255,84,.5)}
+.brand{position:relative;font-family:var(--disp);font-weight:800;letter-spacing:.02em;font-size:27px;line-height:.95;
+  color:var(--osso);text-transform:uppercase}
+.brand::first-letter{color:var(--verde)}
+.brand small{display:block;font-family:var(--ui);font-weight:600;letter-spacing:.32em;font-size:8.5px;color:var(--verde);text-transform:uppercase;margin-top:2px}
+.stats{position:relative;display:flex;gap:7px;flex-wrap:wrap;margin-left:auto}
+.chip{position:relative;background:var(--ink2);padding:4px 13px 4px 11px;display:flex;gap:9px;align-items:baseline;
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%);
+  border-left:2px solid var(--verde2)}
+.chip b{font-family:var(--disp);font-weight:800;font-size:23px;line-height:1;color:var(--verde);letter-spacing:.01em}
+.chip span{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);font-weight:600}
+.chip.warn{border-left-color:var(--ambar)} .chip.warn b{color:var(--ambar)}
+.chip.bad{border-left-color:var(--alerta)} .chip.bad b{color:var(--alerta)}
+#btnMenu{display:none;background:var(--painel);border:0;padding:8px 12px;color:var(--verde);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%)}
 
 /* ---------- layout ---------- */
-main{flex:1;display:flex;min-height:0}
-aside{width:352px;flex:0 0 352px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;overscroll-behavior:contain}
-#map{flex:1;background:#08191C}
+main{position:relative;z-index:1;flex:1;display:flex;min-height:0}
+aside{width:356px;flex:0 0 356px;background:var(--ink2);border-right:1px solid var(--linha);overflow-y:auto;overscroll-behavior:contain}
+aside::-webkit-scrollbar{width:8px}
+aside::-webkit-scrollbar-track{background:var(--ink)}
+aside::-webkit-scrollbar-thumb{background:var(--linha)}
+aside::-webkit-scrollbar-thumb:hover{background:var(--verde2)}
+#map{flex:1;background:#050807}
 
-.sec{border-bottom:1px solid var(--line)}
-.sec>h2{margin:0;font-family:var(--f-disp);font-weight:500;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);
-  padding:12px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
-.sec>h2::before{content:'';width:5px;height:5px;background:var(--line);transform:rotate(45deg);flex:0 0 auto}
-.sec.open>h2{color:var(--teal)} .sec.open>h2::before{background:var(--teal)}
-.sec>h2 .cnt{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--mut)}
-.sec>h2 .cnt.bad{color:var(--alert)}
-.body{display:none;padding:0 14px 16px}
-.sec.open .body{display:block}
+/* ---------- seções ---------- */
+.sec{border-bottom:1px solid var(--linha2)}
+.sec>h2{position:relative;margin:0;font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--mut);padding:11px 14px 9px 17px;display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;transition:color .15s}
+.sec>h2::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--linha);transition:.2s}
+.sec>h2:hover{color:var(--osso)}
+.sec.open>h2{color:var(--osso);background:linear-gradient(90deg,rgba(80,255,84,.10),transparent 70%)}
+.sec.open>h2::before{background:var(--verde);box-shadow:0 0 12px rgba(80,255,84,.8)}
+.sec>h2 .cnt{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--verde)}
+.sec>h2 .cnt.bad{color:var(--alerta)}
+.body{display:none;padding:2px 14px 18px}
+.sec.open .body{display:block;animation:surge .25s ease both}
 
-label.f{display:block;margin:9px 0 4px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
-select,input[type=text],input[type=number],input[type=date]{width:100%;background:#082024;border:1px solid var(--line);border-radius:3px;padding:7px 8px}
+label.f{display:block;margin:11px 0 4px;font-size:9.5px;letter-spacing:.19em;text-transform:uppercase;color:var(--mut);font-weight:600}
+select,input[type=text],input[type=number],input[type=date]{width:100%;background:var(--ink);border:1px solid var(--linha2);
+  border-radius:0;padding:8px;transition:border-color .15s}
+select:hover,input:hover{border-color:var(--linha)}
+select:focus,input:focus{border-color:var(--verde);outline:none}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.btn{width:100%;background:var(--teal);color:#04191B;border:0;border-radius:3px;padding:10px;font-weight:600;letter-spacing:.03em}
-.btn:hover{filter:brightness(1.1)}
-.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:500}
-.btn.ghost:hover{border-color:var(--teal);color:var(--teal);filter:none}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.row{display:flex;gap:8px;margin-top:8px}
 
-#drop{border:1px dashed var(--line);border-radius:4px;padding:20px 12px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
-#drop:hover,#drop.over{border-color:var(--teal);color:var(--teal);background:#0A272B}
-#drop b{display:block;color:var(--txt);font-size:13px;margin-bottom:3px}
-#drop.over b{color:var(--teal)}
+.btn{position:relative;overflow:hidden;width:100%;background:var(--verde);color:#08130B;border:0;padding:11px;
+  font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:.11em;text-transform:uppercase;
+  clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,9px 100%,0 calc(100% - 9px));transition:filter .15s}
+.btn:hover{filter:brightness(1.14)}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:var(--painel);color:var(--osso);box-shadow:inset 0 0 0 1px var(--linha)}
+.btn.ghost::after{content:'';position:absolute;inset:0;background:var(--verde);transform:scaleX(0);transform-origin:left;
+  transition:transform .22s cubic-bezier(.2,.8,.2,1);z-index:-1}
+.btn.ghost:hover{color:#08130B;background:var(--verde);filter:none}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.row{display:flex;gap:8px;margin-top:9px}
 
-.hint{font-size:11.5px;color:var(--mut);line-height:1.5;margin:8px 0 0}
-.bar{height:3px;background:#082024;border-radius:2px;overflow:hidden;margin-top:10px}
-.bar i{display:block;height:100%;background:var(--teal);width:0;transition:width .2s}
+#drop{position:relative;background:var(--ink);padding:24px 12px;text-align:center;color:var(--mut);cursor:pointer;transition:.18s;
+  box-shadow:inset 0 0 0 1px var(--linha2);
+  clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))}
+#drop:hover,#drop.over{color:var(--verde);background:var(--verdeEsc);box-shadow:inset 0 0 0 1px var(--verde)}
+#drop b{display:block;color:var(--osso);font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+#drop.over b{color:var(--verde)}
+
+.hint{font-size:11.5px;color:var(--mut);line-height:1.55;margin:9px 0 0}
+.bar{height:3px;background:var(--ink);overflow:hidden;margin-top:11px}
+.bar i{display:block;height:100%;width:0;transition:width .25s;
+  background:repeating-linear-gradient(115deg,var(--verde) 0 9px,var(--verde2) 9px 18px);
+  box-shadow:0 0 10px rgba(80,255,84,.75)}
 
 /* ---------- alertas ---------- */
-.alerta{border-left:2px solid var(--amber);background:#12262A;border-radius:0 3px 3px 0;padding:9px 10px;margin-bottom:8px;cursor:pointer}
-.alerta:hover{background:#163037}
-.alerta.critico{border-left-color:var(--alert)}
-.alerta .t{display:flex;gap:8px;align-items:baseline}
-.alerta .n{font-family:var(--f-mono);font-weight:700;font-size:12px;color:var(--amber)}
-.alerta.critico .n{color:var(--alert)}
-.alerta .e{font-size:12.5px;font-weight:500;line-height:1.35}
-.alerta .d{font-size:11px;color:var(--mut);margin-top:4px;font-family:var(--f-mono)}
+.alerta{position:relative;background:var(--painel);padding:9px 11px;margin-bottom:7px;cursor:pointer;transition:.15s;
+  border-left:3px solid var(--ambar);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%)}
+.alerta:hover{background:var(--painel2);transform:translateX(2px)}
+.alerta.critico{border-left-color:var(--alerta)}
+.alerta.critico::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--alerta);animation:piscaBarra 1.4s ease-in-out infinite}
+.alerta .t{display:flex;gap:9px;align-items:baseline}
+.alerta .n{font-family:var(--disp);font-weight:800;font-size:19px;line-height:1;color:var(--ambar)}
+.alerta.critico .n{color:var(--alerta)}
+.alerta .e{font-size:12.5px;font-weight:600;line-height:1.35}
+.alerta .d{font-size:10.5px;color:var(--mut);margin-top:4px;font-family:var(--mono)}
 
-/* ---------- rotas ---------- */
-.equipe{border:1px solid var(--line);border-radius:3px;margin-bottom:8px;overflow:hidden}
-.equipe>summary{list-style:none;padding:9px 10px;display:flex;align-items:center;gap:9px;cursor:pointer;background:var(--panel2)}
+/* ---------- rotas e técnicos ---------- */
+.equipe{background:var(--ink);margin-bottom:7px;box-shadow:inset 0 0 0 1px var(--linha2)}
+.equipe>summary{list-style:none;padding:10px 11px;display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--painel);transition:.15s}
 .equipe>summary::-webkit-details-marker{display:none}
-.dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-.equipe .nome{font-weight:600;font-size:12.5px}
-.equipe .meta{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--mut)}
-.parada{display:flex;gap:9px;padding:7px 10px;border-top:1px solid var(--line);font-size:12px;align-items:flex-start}
-.parada:hover{background:#0E2A2F;cursor:pointer}
-.parada .i{font-family:var(--f-mono);font-size:11px;color:var(--mut);min-width:16px}
-.parada .x{color:var(--alert);font-size:11px}
-.falha{font-size:12px;padding:7px 0;border-bottom:1px solid var(--line);color:var(--mut)}
-.falha b{color:var(--txt);display:block;font-weight:500}
-.falha button{background:none;border:0;color:var(--teal);padding:4px 0;font-size:11.5px;text-decoration:underline}
+.equipe>summary:hover{background:var(--painel2)}
+.equipe[open]>summary{box-shadow:inset 3px 0 0 var(--verde)}
+.dot{width:9px;height:9px;flex:0 0 auto;transform:rotate(45deg)}
+.equipe .nome{font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:.05em;text-transform:uppercase}
+.equipe .meta{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--mut)}
+.parada{display:flex;gap:10px;padding:8px 11px;border-top:1px solid var(--linha2);font-size:12px;align-items:flex-start;transition:.12s}
+.parada:hover{background:var(--painel);cursor:pointer;padding-left:14px}
+.parada .i{font-family:var(--disp);font-weight:800;font-size:16px;line-height:1.1;color:var(--verde);min-width:18px}
+.parada .x{color:var(--alerta);font-size:10.5px;font-weight:600}
+.falha{font-size:12px;padding:9px 0;border-bottom:1px solid var(--linha2);color:var(--mut)}
+.falha b{color:var(--osso);display:block;font-weight:600}
+.falha span{display:block;font-size:11px;margin-top:2px}
+.falha button{background:none;border:0;color:var(--verde);padding:5px 0;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.falha button:hover{text-decoration:underline}
 
-/* ---------- marcadores ---------- */
-.pin{position:relative;width:26px;height:26px;border-radius:50% 50% 50% 3px;transform:rotate(-45deg);display:grid;place-items:center;box-shadow:0 3px 7px rgba(0,0,0,.55);border:1.5px solid rgba(2,20,22,.65)}
-.pin b{transform:rotate(45deg);font-family:var(--f-mono);font-weight:700;font-size:11px;color:#04161A}
-.pin.rein::after{content:'';position:absolute;inset:-7px;border:2px solid var(--alert);border-radius:50%;animation:pulso 1.9s ease-out infinite}
-.pin.base{border-radius:3px;background:#fff}
-@keyframes pulso{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.5);opacity:0}}
-@media (prefers-reduced-motion:reduce){.pin.rein::after{animation:none;opacity:.9}}
-.leaflet-popup-content-wrapper{background:var(--panel2);color:var(--txt);border-radius:4px;border:1px solid var(--line)}
-.leaflet-popup-tip{background:var(--panel2)}
-.leaflet-popup-content{margin:11px 13px;font-size:12.5px;line-height:1.5}
-.leaflet-popup-content h4{margin:0 0 5px;font-size:13px;font-family:var(--f-disp);font-weight:500;letter-spacing:.06em}
-.leaflet-popup-content .k{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
-.leaflet-container{background:#08191C}
-.leaflet-control-attribution{background:rgba(6,22,24,.8)!important;color:var(--mut)!important}
+/* ---------- mapa ---------- */
+.leaflet-tile-pane{filter:sepia(.45) hue-rotate(76deg) saturate(1.1) brightness(.78) contrast(1.12)}
+.leaflet-container{background:#050807}
+.pin{position:relative;width:26px;height:26px;transform:rotate(-45deg);display:grid;place-items:center;
+  border-radius:50% 50% 50% 2px;box-shadow:0 4px 10px rgba(0,0,0,.65);
+  animation:cair .4s cubic-bezier(.2,.85,.25,1) both}
+.pin b{transform:rotate(45deg);font-family:var(--disp);font-weight:800;font-size:14px;color:#08130B}
+.pin.rein::after{content:'';position:absolute;inset:-8px;border:2px solid var(--alerta);border-radius:50%;animation:pulso 1.7s ease-out infinite}
+.pin.base{border-radius:2px;background:var(--osso)}
+.rota{animation:fluxo .9s linear infinite}
+@media (prefers-reduced-motion:reduce){
+  .pin,.pin.rein::after,.rota,header::before,.alerta.critico::after,#vazio img,#robo{animation:none}
+}
+.leaflet-popup-content-wrapper{background:var(--ink2);color:var(--osso);border-radius:0;box-shadow:0 0 0 1px var(--verde2),0 12px 34px rgba(0,0,0,.6)}
+.leaflet-popup-tip{background:var(--ink2)}
+.leaflet-popup-content{margin:12px 14px;font-size:12.5px;line-height:1.5}
+.leaflet-popup-content h4{margin:0 0 6px;font-family:var(--disp);font-weight:800;font-size:19px;letter-spacing:.05em;color:var(--verde);text-transform:uppercase}
+.leaflet-popup-content .k{color:var(--mut);font-size:9.5px;text-transform:uppercase;letter-spacing:.17em;font-weight:600}
+.leaflet-control-attribution{background:rgba(10,20,16,.85)!important;color:var(--mut)!important;font-size:10px}
 .leaflet-control-attribution a{color:var(--mut)!important}
+.leaflet-bar a{background:var(--painel)!important;color:var(--verde)!important;border-color:var(--linha)!important}
 
-#aviso{position:absolute;left:50%;transform:translateX(-50%);top:12px;z-index:900;background:var(--alert);color:#fff;
-  padding:9px 14px;border-radius:3px;font-size:12.5px;max-width:88%;display:none;box-shadow:0 6px 18px rgba(0,0,0,.5)}
-#modo{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;z-index:900;background:var(--teal);color:#04191B;
-  padding:9px 16px;border-radius:3px;font-size:12.5px;font-weight:600;display:none}
+/* cantoneiras do HUD sobre o mapa */
+#hud{position:absolute;inset:10px;z-index:400;pointer-events:none}
+#hud i{position:absolute;width:26px;height:26px;border:2px solid rgba(80,255,84,.5)}
+#hud i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0}
+#hud i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0}
+#hud i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0}
+#hud i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0}
+
+/* ---------- mascote ---------- */
+#vazio{position:absolute;right:0;bottom:0;z-index:401;pointer-events:none;max-width:min(42%,400px);
+  display:flex;flex-direction:column;align-items:flex-end;padding:0 14px 14px 0}
+#vazio img{width:100%;height:auto;animation:flutua 5.5s ease-in-out infinite;filter:drop-shadow(0 16px 34px rgba(0,0,0,.7))}
+#vazio p{margin:0 4px 4px 0;font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.2em;text-transform:uppercase;color:var(--mut);text-align:right}
+
+#aviso{position:absolute;left:50%;transform:translateX(-50%);top:14px;z-index:900;background:var(--alerta);color:#fff;
+  padding:10px 16px;font-size:12.5px;font-weight:600;max-width:88%;display:none;
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+#modo{position:absolute;left:50%;transform:translateX(-50%);bottom:20px;z-index:900;background:var(--verde);color:#08130B;
+  padding:10px 18px;font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:.09em;text-transform:uppercase;display:none;
+  clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
 
 @media(max-width:820px){
   #btnMenu{display:block}
-  aside{position:fixed;inset:49px auto 0 0;z-index:1000;width:88%;max-width:352px;transform:translateX(-101%);transition:transform .22s;box-shadow:8px 0 26px rgba(0,0,0,.5)}
+  aside{position:fixed;inset:52px auto 0 0;z-index:1000;width:88%;max-width:356px;transform:translateX(-101%);
+    transition:transform .26s cubic-bezier(.2,.8,.2,1);box-shadow:10px 0 40px rgba(0,0,0,.7)}
   aside.show{transform:none}
-  main{position:relative}
-  .stats{gap:6px} .chip{padding:4px 8px}
+  .brand{font-size:21px}
+  #robo{width:34px;height:34px}
+  header{gap:12px}
+  .chip b{font-size:19px}
+  #vazio{max-width:62%}
+  #hud{inset:6px}
 }
 </style>
 </head>
@@ -124,6 +220,7 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
 
 <header>
   <button id="btnMenu" aria-label="Abrir painel">☰</button>
+  <img id="robo" src="assets/robo.png" alt="Direct">
   <div class="brand">MAPA OS<small>distribuição diária</small></div>
   <div class="stats">
     <div class="chip"><b id="sTotal">0</b><span>OS</span></div>
@@ -197,6 +294,10 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
         <div><label class="f">Grupos (modo N por região)</label><input type="number" id="cfgEquipes" min="1" max="10" value="3"></div>
         <div><label class="f">Teto de OS por técnico</label><input type="number" id="cfgLimite" min="1" max="30" value="8"></div>
       </div>
+      <div class="grid2" style="margin-top:9px">
+        <div><label class="f">Minutos por atendimento</label><input type="number" id="cfgTempoOS" min="5" max="240" value="40"></div>
+        <div><label class="f">Velocidade média (km/h)</label><input type="number" id="cfgVel" min="5" max="90" value="25"></div>
+      </div>
       <div id="nomesEquipes"></div>
       <label class="f">Ponto de partida das rotas</label>
       <button class="btn ghost" id="btnBase">Marcar no mapa</button>
@@ -231,9 +332,11 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
     <h2>Revisar no mapa <span class="cnt" id="cntFalha"></span></h2>
     <div class="body">
       <div id="listaFalha"><p class="hint">Nenhuma pendência.</p></div>
-      <p class="hint" style="margin-top:12px;color:#DCEFEF">Trazer as coordenadas do My Maps</p>
+      <div id="blocoMyMaps">
+      <p class="hint" style="margin-top:12px;color:var(--osso)">Trazer as coordenadas do My Maps</p>
       <div class="row"><button class="btn ghost" id="btnParaMyMaps">1. Baixar endereços (CSV)</button></div>
       <div class="row"><button class="btn ghost" id="btnDoMyMaps">2. Carregar KML do My Maps</button></div>
+      </div>
       <input type="file" id="fileKml" accept=".kml" hidden>
       <p class="hint">Importe o CSV no My Maps, exporte a camada como KML e traga de volta aqui. As coordenadas ficam salvas e valem para todos os dias seguintes.</p>
     </div>
@@ -259,6 +362,8 @@ select,input[type=text],input[type=number],input[type=date]{width:100%;backgroun
 
 <div style="flex:1;position:relative;display:flex">
   <div id="map"></div>
+  <div id="hud"><i></i><i></i><i></i><i></i></div>
+  <div id="vazio"><img src="assets/mascote.png" alt=""><p>solte a planilha do dia</p></div>
   <div id="aviso"></div>
   <div id="modo"></div>
 </div>
@@ -415,10 +520,13 @@ function separarEndereco(bruto){
   const p = {logradouro:'',numero:'',bairro:'',cidade:'',uf:'',cep:'',vazio:false};
   let t = String(bruto||'').trim();
   if(!t) { p.vazio = true; return p; }
-  const mcep = t.match(/CEP:\s*(\d{5}-?\d{3})/i);
+  const mcep = t.match(/CEP[:\s]*(\d{5}-?\d{3})/i);
   if(mcep) p.cep = mcep[1];
   t = t.split('|')[0].trim().replace(/,\s*$/,'');
-  if(/^S\/END|^N\/A|^SEM ENDERE/i.test(t)){ p.vazio = true; return p; }
+  const mfim = t.match(/,?\s*(\d{5}-?\d{3})\s*$/);          // CEP no fim, formato Google
+  if(mfim){ if(!p.cep) p.cep = mfim[1]; t = t.replace(/,?\s*\d{5}-?\d{3}\s*$/,''); }
+  t = t.replace(/\s*-\s*([A-Za-z]{2})\s*$/, '/$1');          // "Pinhais - PR" → "Pinhais/PR"
+  const semRua = /^S\/END|^N\/A|^SEM ENDERE/i.test(t);
 
   const corte = t.lastIndexOf(' - ');
   let via = t, resto = '';
@@ -437,8 +545,36 @@ function separarEndereco(bruto){
     if(mc){ p.cidade = mc[1]; p.uf = mc[2].toUpperCase(); rp.pop(); }
     p.bairro = rp.join(', ');
   }
-  if(!p.logradouro && !p.cidade) p.vazio = true;
+  if(semRua){ p.logradouro = ''; p.numero = ''; if(/^S\/BAIRRO/i.test(p.bairro)) p.bairro = ''; }
+  p.vazio = !p.logradouro && !p.cidade;
   return p;
+}
+
+/* muitas OS trazem o endereço bom escrito na descrição — nas de infra é o único */
+const TIPO_VIA = '(?:RUA|R\\.|AVENIDA|AV\\.?|RODOVIA|ROD\\.?|ESTRADA|ESTR\\.?|TRAVESSA|TV\\.?|ALAMEDA|AL\\.?|PRACA|LINHA|SERVIDAO)';
+function enderecoNaDescricao(txt){
+  if(!txt) return null;
+  const linhas = String(txt).split(/\r?\n/).map(l => l.replace(/^[\s→>*\-–]+/,'').trim()).filter(Boolean);
+  const arrumar = v => v.replace(/\|?\s*CEP[:\s]*\d{5}-?\d{0,3}.*$/i,'')
+                        .replace(/(TEL|FONE|CONTATO)[:\s].*$/i,'')
+                        .replace(/\+?55\s*\(?\d{2}\)?\s*9?\d{4}-?\d{3,4}.*$/,'')
+                        .replace(/\s*[-–]\s*$/,'').replace(/[,;]\s*$/,'').trim();
+  for(let i=0;i<linhas.length;i++){
+    const m = linhas[i].match(/^(?:END|ENDERECO|ENDEREÇO|LOCAL|RUA)\s*:\s*(.*)$/i);
+    if(m){
+      let v = m[1].trim();
+      for(let j=i+1; j<linhas.length && !v; j++)
+        if(!/^(google maps|cabo|codigo|c[óo]digo)/i.test(linhas[j])) v = linhas[j].trim();
+      if(v && v.length > 4) return arrumar(v);
+    }
+  }
+  for(const l of linhas)
+    if(new RegExp('^'+TIPO_VIA+'\\b','i').test(semAcento(l)) && l.length > 8) return arrumar(l);
+  return null;
+}
+function cepNaDescricao(txt){
+  const m = String(txt||'').match(/CEP[:\s]*(\d{5})-?(\d{3})/i) || String(txt||'').match(/\b(\d{5})-(\d{3})\b/);
+  return m ? m[1] + m[2] : null;
 }
 
 function montarEndereco(l){
@@ -504,7 +640,24 @@ async function processar(linhas){
     if(!it.contrato && it.codCliente) it.contrato = it.codCliente;
     it.janela = c.obs ? janelaPedida(l[c.obs]) : '';
     it.partes = separarEndereco(it.endereco);
-    it.semEndereco = it.partes.vazio && !it.lat;
+
+    const desc = c.obs ? String(l[c.obs]||'') : '';
+    const alt = desc ? enderecoNaDescricao(desc) : null;
+    if(alt){
+      const pa = separarEndereco(alt);
+      it.altPartes = pa;
+      if(!it.partes.logradouro && pa.logradouro){          // infra: a rua só existe na descrição
+        it.partes.logradouro = pa.logradouro;
+        it.partes.numero = it.partes.numero || pa.numero;
+        it.partes.bairro = it.partes.bairro || pa.bairro;
+        if(!it.partes.cidade){ it.partes.cidade = pa.cidade; it.partes.uf = pa.uf; }
+        it.origemEnd = 'descrição da OS';
+        const z = [it.partes.bairro, (it.partes.cidade||'') + (it.partes.uf ? '/'+it.partes.uf : '')].filter(x=>x && x!=='/').join(', ');
+        it.endereco = it.partes.logradouro + (it.partes.numero ? ', '+it.partes.numero : '') + (z ? ' - '+z : '');
+      }
+    }
+    if(!it.partes.cep && desc){ const cd = cepNaDescricao(desc); if(cd) it.partes.cep = cd; }
+    it.semEndereco = !it.partes.logradouro && !it.partes.cep && !it.lat;
     it.k = chaveOcorrencia(it);
     return it;
   });
@@ -579,18 +732,34 @@ async function buscarOsm(it){
           precisao: PREC_OSM[j[0].addresstype] || 'aproximada', fonte:'osm'};
 }
 
-/* ----- CEP (BrasilAPI) ----- */
+/* ----- CEP: BrasilAPI e, se ela não tiver coordenada, AwesomeAPI ----- */
 async function buscarCep(cep){
   if(!cep) return null;
-  const limpo = cep.replace(/\D/g,'');
+  const limpo = String(cep).replace(/\D/g,'');
   if(limpo.length !== 8) return null;
-  if(cacheGeo['cep:'+limpo]) { const c = cacheGeo['cep:'+limpo]; return c ? {lat:c[0], lon:c[1], precisao:'CEP', fonte:'cep'} : null; }
-  const r = await fetch('https://brasilapi.com.br/api/cep/v2/' + limpo);
-  if(!r.ok) return null;
-  const j = await r.json();
-  const c = j && j.location && j.location.coordinates;
-  if(!c || !c.latitude) return null;
-  const par = [parseFloat(c.latitude), parseFloat(c.longitude)];
+  if(cacheGeo['cep:'+limpo]){
+    const c = cacheGeo['cep:'+limpo];
+    return c ? {lat:c[0], lon:c[1], precisao:'CEP', fonte:'cep'} : null;
+  }
+  let par = null;
+  try{
+    const r = await fetch('https://brasilapi.com.br/api/cep/v2/' + limpo);
+    if(r.ok){
+      const j = await r.json();
+      const c = j && j.location && j.location.coordinates;
+      if(c && c.latitude) par = [parseFloat(c.latitude), parseFloat(c.longitude)];
+    }
+  }catch(e){}
+  if(!par){
+    try{
+      const r = await fetch('https://cep.awesomeapi.com.br/json/' + limpo);
+      if(r.ok){
+        const j = await r.json();
+        if(j && j.lat) par = [parseFloat(j.lat), parseFloat(j.lng)];
+      }
+    }catch(e){}
+  }
+  if(!par) return null;
   cacheGeo['cep:'+limpo] = par;
   return {lat:par[0], lon:par[1], precisao:'CEP', fonte:'cep'};
 }
@@ -632,9 +801,16 @@ async function geocodificarTodos(){
           await espera(120);
         }
         if(!r){
-          const [osm, cep] = [await buscarOsm(it).catch(()=>null), await buscarCep((it.partes||{}).cep).catch(()=>null)];
-          r = melhorResultado(osm, cep);
+          const cep = await buscarCep((it.partes||{}).cep).catch(()=>null);
+          let osm = await buscarOsm(it).catch(()=>null);
           await espera(1100);                     // Nominatim: 1 consulta por segundo
+          // segunda chance com o endereço escrito na descrição, que costuma vir melhor formatado
+          if(it.altPartes && (!osm || osm.precisao === 'bairro' || osm.precisao === 'aproximada')){
+            const alt = await buscarOsm({partes: it.altPartes}).catch(()=>null);
+            await espera(1100);
+            if(alt && (!osm || alt.precisao === 'exata' || (alt.precisao === 'rua' && osm.precisao !== 'exata'))) osm = alt;
+          }
+          r = melhorResultado(osm, cep);
         }
       }catch(e){
         if(++falhouRede === 3){
@@ -716,46 +892,156 @@ function montarRotas(){
   }
 
   const k = Math.max(1, Math.min(cfg.equipes|0 || 1, 10));
-  agruparPorRegiao(pts, k).forEach((g,i)=> g.forEach(p => p.equipe = i));
+  agruparPorRegiao(pts, k, cfg.limiteOS).forEach((g,i)=> g.forEach(p => p.equipe = i));
   desenharNomes();
   ordenarVisitas(pts, k);
 }
 
-/* k-means com carga equilibrada; devolve os grupos, sem mexer em it.equipe */
-function agruparPorRegiao(pts, k){
+/* ===========================================================
+   Divisão geográfica
+   Objetivo: nenhuma equipe rodar muito mais que a outra.
+   1. k-means++ com semente fixa (mesma entrada, mesma divisão)
+   2. atribuição por custo global respeitando o teto de OS
+   3. troca de paradas entre equipes até achatar a maior rota
+   =========================================================== */
+const kmEntre = (a,b)=> Math.hypot((a.lat-b.lat)*111.32,
+                                   (a.lon-b.lon)*111.32*Math.cos((a.lat+b.lat)/2*Math.PI/180));
+
+function sorteio(semente){                     // aleatório reproduzível
+  let t = semente >>> 0;
+  return ()=>{ t = (t + 0x6D2B79F5) >>> 0;
+    let x = Math.imul(t ^ (t>>>15), 1 | t);
+    x = (x + Math.imul(x ^ (x>>>7), 61 | x)) ^ x;
+    return ((x ^ (x>>>14)) >>> 0) / 4294967296; };
+}
+
+function sementes(pts, k, rnd){
+  const c = [pts[Math.floor(rnd()*pts.length)]];
+  while(c.length < k){
+    const d2 = pts.map(p => Math.min(...c.map(x => kmEntre(p,x)**2)));
+    const soma = d2.reduce((a,b)=>a+b, 0);
+    if(soma <= 0){ c.push(pts[c.length % pts.length]); continue; }
+    let r = rnd()*soma, i = 0;
+    while(i < pts.length-1 && r > d2[i]){ r -= d2[i]; i++; }
+    c.push(pts[i]);
+  }
+  return c.map(p => ({lat:p.lat, lon:p.lon}));
+}
+
+/* cada ponto vai para o centro mais próximo que ainda tem vaga,
+   resolvendo os pares na ordem global de distância — não por ponto */
+function atribuir(pts, centros, teto){
+  const pares = [];
+  pts.forEach((p,i) => centros.forEach((c,j) => pares.push([kmEntre(p,c), i, j])));
+  pares.sort((a,b) => a[0]-b[0]);
+  const grupo = new Array(pts.length).fill(-1), carga = new Array(centros.length).fill(0);
+  let faltam = pts.length;
+  for(const [, i, j] of pares){
+    if(grupo[i] >= 0 || carga[j] >= teto) continue;
+    grupo[i] = j; carga[j]++;
+    if(--faltam === 0) break;
+  }
+  pts.forEach((p,i)=>{ if(grupo[i] < 0){
+    const j = carga.indexOf(Math.min(...carga)); grupo[i] = j; carga[j]++;
+  }});
+  return grupo;
+}
+
+/* o que precisa ficar parelho é a jornada, não a contagem de OS:
+   deslocamento + tempo parado em cada atendimento */
+const velocidadeMedia = ()=> cfg.velocidade || 25;      // km/h no trânsito urbano
+const tempoPorOS      = ()=> cfg.tempoOS    || 40;      // minutos por atendimento
+function tempoRota(lista){
+  return custoRota(lista)/velocidadeMedia()*60 + lista.length*tempoPorOS();
+}
+
+/* custo rápido de uma rota: vizinho mais próximo, sem refino */
+function custoRota(lista){
+  if(lista.length < 2) return 0;
+  const restam = lista.slice();
+  let atual = cfg.base ? {lat:cfg.base[0], lon:cfg.base[1]} : restam[0], km = 0;
+  while(restam.length){
+    let m = 0, dm = Infinity;
+    restam.forEach((p,j)=>{ const d = kmEntre(atual,p); if(d < dm){ dm = d; m = j; } });
+    km += dm; atual = restam[m]; restam.splice(m,1);
+  }
+  return km;
+}
+
+function agruparPorRegiao(pts, k, tetoPedido){
   k = Math.max(1, Math.min(k, pts.length));
-  let centros = [];
-  const passo = Math.max(1, Math.floor(pts.length/k));
-  for(let i=0;i<k;i++){ const p = pts[Math.min(i*passo, pts.length-1)]; centros.push([p.lat,p.lon]); }
-  for(let volta=0; volta<40; volta++){
-    pts.forEach(p=>{
-      let melhor=0, dm=Infinity;
-      centros.forEach((c,i)=>{ const d=(p.lat-c[0])**2+(p.lon-c[1])**2; if(d<dm){dm=d;melhor=i;} });
-      p._g = melhor;
-    });
-    let mudou=false;
-    centros = centros.map((c,i)=>{
-      const g = pts.filter(p=>p._g===i);
-      if(!g.length) return c;
-      const nc = [g.reduce((s,p)=>s+p.lat,0)/g.length, g.reduce((s,p)=>s+p.lon,0)/g.length];
-      if(Math.abs(nc[0]-c[0])>1e-7||Math.abs(nc[1]-c[1])>1e-7) mudou=true;
-      return nc;
-    });
-    if(!mudou) break;
+  if(k === 1) return [pts.slice()];
+  // folga proposital: contagem igual à força é o que desequilibra a jornada
+  const teto = Math.max(tetoPedido || 0, Math.ceil(pts.length/k), 1);
+
+  let melhor = null;
+  for(let tentativa = 0; tentativa < 8; tentativa++){
+    const rnd = sorteio(pts.length * 7919 + tentativa * 104729);
+    let centros = sementes(pts, k, rnd), grupo = null;
+    for(let volta = 0; volta < 30; volta++){
+      const novo = atribuir(pts, centros, teto);
+      const igual = grupo && novo.every((g,i) => g === grupo[i]);
+      grupo = novo;
+      if(igual) break;
+      centros = centros.map((c,j)=>{
+        const g = pts.filter((_,i) => grupo[i] === j);
+        if(!g.length) return c;
+        return {lat: g.reduce((s,p)=>s+p.lat,0)/g.length, lon: g.reduce((s,p)=>s+p.lon,0)/g.length};
+      });
+    }
+    const grupos = centros.map((_,j) => pts.filter((_,i) => grupo[i] === j));
+    const custos = grupos.map(tempoRota);
+    const nota = Math.max(...custos) * 2 + custos.reduce((a,b)=>a+b,0);   // pune a jornada mais longa
+    if(!melhor || nota < melhor.nota) melhor = {grupos, nota};
   }
-  const teto = Math.ceil(pts.length/k);
-  for(let volta=0; volta<200; volta++){
-    const grupos = centros.map((_,i)=>pts.filter(p=>p._g===i));
-    const cheio = grupos.findIndex(g=>g.length>teto);
-    if(cheio<0) break;
-    const g = grupos[cheio], c = centros[cheio];
-    g.sort((a,b)=> ((b.lat-c[0])**2+(b.lon-c[1])**2) - ((a.lat-c[0])**2+(a.lon-c[1])**2));
-    const alvo = grupos.map((gr,i)=>({i, n:gr.length})).filter(o=>o.n<teto).sort((a,b)=>a.n-b.n)[0];
-    if(!alvo) break;
-    g[0]._g = alvo.i;
+
+  return equilibrarCarga(melhor.grupos, teto);
+}
+
+/* achata a rota mais longa passando paradas para quem roda menos */
+function equilibrarCarga(grupos, teto){
+  for(let passo = 0; passo < 120; passo++){
+    const custos = grupos.map(tempoRota);
+    const pior = custos.indexOf(Math.max(...custos));
+    if(grupos[pior].length < 2) break;
+    let ganho = null;
+
+    // 1. mover uma parada da jornada mais longa para outra
+    grupos[pior].forEach((p, pi)=>{
+      grupos.forEach((g, j)=>{
+        if(j === pior || g.length >= teto) return;
+        const maior = Math.max(tempoRota(grupos[pior].filter((_,x)=>x!==pi)),
+                               tempoRota(g.concat([p])),
+                               ...custos.filter((_,q)=> q!==pior && q!==j));
+        if(maior < custos[pior] - 1 && (!ganho || maior < ganho.maior))
+          ganho = {tipo:'mover', pi, j, maior};
+      });
+    });
+
+    // 2. trocar duas paradas de lugar, quando mover sozinho não resolve
+    grupos[pior].forEach((p, pi)=>{
+      grupos.forEach((g, j)=>{
+        if(j === pior) return;
+        g.forEach((q, qi)=>{
+          const a = grupos[pior].map((x,ix)=> ix===pi ? q : x);
+          const b = g.map((x,ix)=> ix===qi ? p : x);
+          const maior = Math.max(tempoRota(a), tempoRota(b),
+                                 ...custos.filter((_,z)=> z!==pior && z!==j));
+          if(maior < custos[pior] - 1 && (!ganho || maior < ganho.maior))
+            ganho = {tipo:'trocar', pi, j, qi, maior};
+        });
+      });
+    });
+
+    if(!ganho) break;
+    if(ganho.tipo === 'mover'){
+      grupos[ganho.j].push(grupos[pior].splice(ganho.pi, 1)[0]);
+    } else {
+      const p = grupos[pior][ganho.pi];
+      grupos[pior][ganho.pi] = grupos[ganho.j][ganho.qi];
+      grupos[ganho.j][ganho.qi] = p;
+    }
   }
-  const grupos = [];
-  for(let i=0;i<k;i++) grupos.push(pts.filter(p=>p._g===i));
   return grupos;
 }
 
@@ -813,7 +1099,7 @@ function distribuirEntreTecnicos(pts){
       }
     }
     pool.forEach(t=>usados.add(t.nome));
-    agruparPorRegiao(lista, pool.length).forEach((g,i)=>{
+    agruparPorRegiao(lista, pool.length, limite).forEach((g,i)=>{
       const t = pool[Math.min(i, pool.length-1)];
       g.forEach(it => it.equipe = disp.indexOf(t));
     });
@@ -867,11 +1153,12 @@ function desenharTudo(){
   camadas.rotas.clearLayers();
 
   const comLocal = itens.filter(it=>it.lat);
-  comLocal.forEach(it=>{
+  comLocal.forEach((it,i)=>{
     const cor = CORES[(it.equipe||0) % CORES.length];
+    const atraso = Math.min(i * 22, 900);
     const icone = L.divIcon({
       className:'', iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-24],
-      html:`<div class="pin ${it.nivel!=='ok'?'rein':''}" style="background:${cor}"><b>${it.ordem||''}</b></div>`
+      html:`<div class="pin ${it.nivel!=='ok'?'rein':''}" style="background:${cor};animation-delay:${atraso}ms"><b>${it.ordem||''}</b></div>`
     });
     const m = L.marker([it.lat,it.lon],{icon:icone}).addTo(camadas.marcadores);
     m.bindPopup(popup(it));
@@ -884,7 +1171,7 @@ function desenharTudo(){
     const g = comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>(a.ordem||0)-(b.ordem||0));
     const pts = g.map(it=>[it.lat,it.lon]);
     if(cfg.base) pts.unshift(cfg.base);
-    if(pts.length>1) L.polyline(pts,{color:CORES[e%CORES.length], weight:2, opacity:.5, dashArray:'5 6'}).addTo(camadas.rotas);
+    if(pts.length>1) L.polyline(pts,{className:'rota', color:CORES[e%CORES.length], weight:2, opacity:.55, dashArray:'6 5'}).addTo(camadas.rotas);
   });
 
   if(cfg.base){
@@ -924,17 +1211,32 @@ function popup(it){
 }
 
 /* ---------- painéis ---------- */
+function animarNumero(sel, valor){
+  const el = $(sel); if(!el) return;
+  const de = parseInt(el.textContent, 10) || 0;
+  if(de === valor || matchMedia('(prefers-reduced-motion: reduce)').matches){ el.textContent = valor; return; }
+  const t0 = performance.now(), dur = 420;
+  const passo = t => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = Math.round(de + (valor - de) * e);
+    if(k < 1) requestAnimationFrame(passo);
+  };
+  requestAnimationFrame(passo);
+}
+
 function atualizarPaineis(){
+  const vazio = $('#vazio'); if(vazio) vazio.style.display = itens.length ? 'none' : 'flex';
+  const mm = $('#blocoMyMaps'); if(mm) mm.style.display = (cfg.googleKey||'').trim() ? 'none' : 'block';
   const comLocal = itens.filter(it=>it.lat);
   const rein = itens.filter(it=>it.nivel!=='ok');
   const falhas = itens.filter(it=>!it.lat);
   const aprox = itens.filter(it=>it.lat && it.precisao && it.precisao!=='exata');
 
-  $('#sTotal').textContent = itens.length;
-  $('#sPlot').textContent = comLocal.length;
-  $('#sRein').textContent = rein.length;
-  $('#sFalha').textContent = falhas.length;
-  $('#sAprox').textContent = aprox.length;
+  animarNumero('#sTotal', itens.length);
+  animarNumero('#sPlot', comLocal.length);
+  animarNumero('#sRein', rein.length);
+  animarNumero('#sFalha', falhas.length);
+  animarNumero('#sAprox', aprox.length);
   $('#cntRein').textContent = rein.length || '';
   $('#cntRein').className = 'cnt' + (rein.length?' bad':'');
   $('#cntFalha').textContent = (falhas.length + aprox.length) || '';
@@ -966,7 +1268,7 @@ function atualizarPaineis(){
     const alertas = g.filter(it=>it.nivel!=='ok').length;
     const link = linkRota(g);
     return `<details class="equipe"><summary><span class="dot" style="background:${CORES[e%CORES.length]}"></span>
-      <span class="nome">${esc(nomeEquipe(e))}</span><span class="meta">${g.length} OS${alertas?' · '+alertas+' ⚠':''}</span></summary>
+      <span class="nome">${esc(nomeEquipe(e))}</span><span class="meta">${g.length} OS · ${resumoEquipe(g).km} km · ${resumoEquipe(g).jornada}${alertas?' · '+alertas+'⚠':''}</span></summary>
       ${g.map(it=>`<div class="parada" data-os="${esc(it.os)}"><span class="i">${it.ordem}</span>
         <span>${esc(it.cliente||it.endereco)}<br><span style="color:#7CA3A8;font-size:11px">${esc(it.endereco)}</span>
         ${it.janela?`<br><span style="color:#3FB6F0;font-size:11px">${esc(it.janela)}</span>`:''}
@@ -1017,6 +1319,14 @@ function atualizarPaineis(){
       (top.length? '<p class="hint" style="margin-top:8px;color:#DCEFEF">Mais repetidos em '+cfg.janela+' dias</p>' +
         top.map(o=>`<div class="d" style="font-size:11.5px;color:#7CA3A8;font-family:var(--f-mono)">${o.n}× ${esc(o.rot)}</div>`).join('') : '');
   }
+}
+
+function resumoEquipe(g){
+  const seq = cfg.base ? [{lat:cfg.base[0], lon:cfg.base[1]}, ...g] : g;
+  let km = 0;
+  for(let i=1;i<seq.length;i++) km += kmEntre(seq[i-1], seq[i]);
+  const min = km/velocidadeMedia()*60 + g.length*tempoPorOS();
+  return {km: km.toFixed(1), jornada: Math.floor(min/60) + 'h' + String(Math.round(min%60)).padStart(2,'0')};
 }
 
 function linkRota(g){
@@ -1338,7 +1648,7 @@ $('#fileBase').onchange = async e => {
     $('#statusImp').textContent = 'Base restaurada: ' + Object.keys(historico).length + ' dias.';
   }catch(err){ $('#statusImp').textContent = 'Não consegui ler esse arquivo de base.'; }
 };
-['#cfgCidade','#cfgChave','#cfgJanela','#cfgEquipes','#cfgDivisao','#cfgLimite','#cfgGoogle','#dia'].forEach(s=> $(s).onchange = ()=>{ lerConfig(); Base.set(K_CFG,cfg); });
+['#cfgCidade','#cfgChave','#cfgJanela','#cfgEquipes','#cfgDivisao','#cfgLimite','#cfgGoogle','#cfgTempoOS','#cfgVel','#dia'].forEach(s=> $(s).onchange = ()=>{ lerConfig(); Base.set(K_CFG,cfg); });
 
 function lerConfig(){
   const antes = cfg.equipes;
@@ -1349,6 +1659,8 @@ function lerConfig(){
   cfg.divisao = $('#cfgDivisao').value;
   cfg.limiteOS = +$('#cfgLimite').value || 8;
   cfg.googleKey = $('#cfgGoogle').value.trim();
+  cfg.tempoOS = +$('#cfgTempoOS').value || 40;
+  cfg.velocidade = +$('#cfgVel').value || 25;
   desenharTecnicos();
   if(cfg.equipes !== antes) desenharNomes();
 }
@@ -1360,6 +1672,8 @@ function escreverConfig(){
   $('#cfgDivisao').value = cfg.divisao||'tecnicos';
   $('#cfgLimite').value = cfg.limiteOS||8;
   $('#cfgGoogle').value = cfg.googleKey||'';
+  $('#cfgTempoOS').value = cfg.tempoOS||40;
+  $('#cfgVel').value = cfg.velocidade||25;
   desenharNomes();
   desenharTecnicos();
 }
