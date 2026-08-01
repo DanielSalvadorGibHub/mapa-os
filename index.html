@@ -160,10 +160,17 @@ select:focus,input:focus{border-color:var(--verde);outline:none}
 .falha button:hover{text-decoration:underline}
 
 /* ---------- mapa ---------- */
-.leaflet-tile-pane{filter:sepia(.45) hue-rotate(76deg) saturate(1.1) brightness(.78) contrast(1.12)}
-.leaflet-container{background:#050807}
+#map.base-escuro .leaflet-tile-pane{filter:sepia(.45) hue-rotate(76deg) saturate(1.05) brightness(.85) contrast(1.1)}
+#map.base-cinza  .leaflet-tile-pane{filter:saturate(.5) contrast(1.04)}
+#map.base-claro  .leaflet-tile-pane{filter:saturate(.92) contrast(1.03)}
+.leaflet-container{background:#0E1512}
+#btnMapa{position:absolute;top:18px;right:18px;z-index:500;background:var(--ink2);color:var(--verde);
+  border:1px solid var(--linha);padding:7px 13px;font-family:var(--disp);font-weight:700;font-size:14px;
+  letter-spacing:.12em;text-transform:uppercase;
+  clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,7px 100%,0 calc(100% - 7px))}
+#btnMapa:hover{background:var(--verde);color:#08130B;border-color:var(--verde)}
 .pin{position:relative;width:26px;height:26px;transform:rotate(-45deg);display:grid;place-items:center;
-  border-radius:50% 50% 50% 2px;box-shadow:0 4px 10px rgba(0,0,0,.65);
+  border-radius:50% 50% 50% 2px;box-shadow:0 3px 9px rgba(0,0,0,.45);border:2px solid #0A1410;
   animation:cair .4s cubic-bezier(.2,.85,.25,1) both}
 .pin b{transform:rotate(45deg);font-family:var(--disp);font-weight:800;font-size:14px;color:#08130B}
 .pin.rein::after{content:'';position:absolute;inset:-8px;border:2px solid var(--alerta);border-radius:50%;animation:pulso 1.7s ease-out infinite}
@@ -221,7 +228,7 @@ select:focus,input:focus{border-color:var(--verde);outline:none}
 <header>
   <button id="btnMenu" aria-label="Abrir painel">☰</button>
   <img id="robo" src="assets/robo.png" alt="Direct">
-  <div class="brand">MAPA OS<small>distribuição diária · v7 · 31/07</small></div>
+  <div class="brand">MAPA OS<small>distribuição diária · v8 · 31/07</small></div>
   <div class="stats">
     <div class="chip"><b id="sTotal">0</b><span>OS</span></div>
     <div class="chip"><b id="sPlot">0</b><span>no mapa</span></div>
@@ -297,6 +304,13 @@ select:focus,input:focus{border-color:var(--verde);outline:none}
       <div class="grid2" style="margin-top:9px">
         <div><label class="f">Minutos por atendimento</label><input type="number" id="cfgTempoOS" min="5" max="240" value="40"></div>
         <div><label class="f">Velocidade média (km/h)</label><input type="number" id="cfgVel" min="5" max="90" value="25"></div>
+      </div>
+      <div style="margin-top:9px">
+        <label class="f">Traçado das rotas</label>
+        <select id="cfgRuas">
+          <option value="sim">seguir as ruas (mais preciso)</option>
+          <option value="nao">linha direta (mais rápido)</option>
+        </select>
       </div>
       <div id="nomesEquipes"></div>
       <label class="f">Ponto de partida das rotas</label>
@@ -423,10 +437,30 @@ function modo(txt){ const m=$('#modo'); if(txt){m.textContent=txt;m.style.displa
 function iniciarMapa(){
   mapa = L.map('map',{zoomControl:true, attributionControl:true}).setView([-14.24,-51.92],4);
   let erros = 0;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    maxZoom:19, subdomains:'abcd',
-    attribution:'&copy; OpenStreetMap &copy; CARTO'
-  }).addTo(mapa).on('tileerror',()=>{ if(++erros===8) aviso('O mapa de fundo foi bloqueado neste ambiente. Baixe este arquivo e abra direto no navegador — os marcadores continuam funcionando.'); });
+  const BASES = {
+    claro:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    cinza:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    escuro:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+  };
+  camadas.base_tiles = L.tileLayer(BASES[cfg.mapa||'claro'] || BASES.claro,{
+    maxZoom:19, subdomains:'abcd', attribution:'&copy; OpenStreetMap &copy; CARTO'
+  }).addTo(mapa).on('tileerror',()=>{ if(++erros===8) aviso('O mapa de fundo foi bloqueado neste ambiente. Abra a página publicada no navegador — os marcadores continuam funcionando.'); });
+
+  const ordem = ['claro','cinza','escuro'], rotulo = {claro:'Claro', cinza:'Cinza', escuro:'Escuro'};
+  const aplicar = ()=>{
+    const m = cfg.mapa || 'claro';
+    camadas.base_tiles.setUrl(BASES[m] || BASES.claro);
+    $('#map').className = 'base-' + m;
+    const b = $('#btnMapa'); if(b) b.textContent = rotulo[m];
+  };
+  const botao = document.createElement('button');
+  botao.id = 'btnMapa'; botao.title = 'Trocar o fundo do mapa';
+  botao.onclick = ()=>{
+    cfg.mapa = ordem[(ordem.indexOf(cfg.mapa||'claro') + 1) % ordem.length];
+    Base.set(K_CFG, cfg); aplicar();
+  };
+  document.getElementById('map').parentElement.append(botao);
+  aplicar();
 
   camadas.marcadores = L.layerGroup().addTo(mapa);
   camadas.rotas = L.layerGroup().addTo(mapa);
@@ -1171,8 +1205,10 @@ function desenharTudo(){
     const g = comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>(a.ordem||0)-(b.ordem||0));
     const pts = g.map(it=>[it.lat,it.lon]);
     if(cfg.base) pts.unshift(cfg.base);
-    if(pts.length>1) L.polyline(pts,{className:'rota', color:CORES[e%CORES.length], weight:2, opacity:.55, dashArray:'6 5'}).addTo(camadas.rotas);
+    if(pts.length>1) L.polyline(pts,{className:'rota', color:CORES[e%CORES.length], weight:2, opacity:.35, dashArray:'6 5'}).addTo(camadas.rotas);
   });
+  rotasReais = {};
+  tracarPelasRuas();
 
   if(cfg.base){
     if(camadas.base) mapa.removeLayer(camadas.base);
@@ -1208,6 +1244,42 @@ function popup(it){
   const g = `https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lon}`;
   h.push(`<div style="margin-top:8px"><a href="${g}" target="_blank" rel="noopener" style="color:#2AE0C0">Abrir no Google Maps</a></div>`);
   return h.join('');
+}
+
+/* ===========================================================
+   Traçado pelas ruas
+   OSRM público: devolve a geometria da rota e o tempo real de
+   deslocamento. Se falhar, fica o traço reto de antes.
+   =========================================================== */
+let rotasReais = {};        // equipe → {km, min}
+
+async function tracarPelasRuas(){
+  if(cfg.ruas === false) return;
+  const comLocal = itens.filter(it=>it.lat);
+  const equipes = [...new Set(comLocal.map(it=>it.equipe||0))].sort();
+  let falhas = 0;
+
+  for(const e of equipes){
+    const g = comLocal.filter(it=>(it.equipe||0)===e).sort((a,b)=>a.ordem-b.ordem);
+    const pontos = cfg.base ? [{lat:cfg.base[0], lon:cfg.base[1]}, ...g] : g;
+    if(pontos.length < 2) continue;
+    const coords = pontos.slice(0,100).map(p => p.lon.toFixed(6)+','+p.lat.toFixed(6)).join(';');
+    try{
+      const r = await fetch('https://router.project-osrm.org/route/v1/driving/' + coords + '?overview=full&geometries=geojson');
+      const j = await r.json();
+      const rota = j && j.routes && j.routes[0];
+      if(!rota) { falhas++; continue; }
+      rotasReais[e] = {km: rota.distance/1000, min: rota.duration/60};
+      const linha = rota.geometry.coordinates.map(c => [c[1], c[0]]);
+      L.polyline(linha, {className:'rota', color:CORES[e % CORES.length], weight:4, opacity:.85})
+        .addTo(camadas.rotas).bringToBack();
+      L.polyline(linha, {color:'#0A1410', weight:7, opacity:.35}).addTo(camadas.rotas).bringToBack();
+    }catch(err){ falhas++; }
+    await espera(350);
+  }
+  if(falhas && falhas === equipes.length)
+    $('#statusImp').textContent += ' (não consegui traçar pelas ruas; mostrando linhas diretas)';
+  else if(Object.keys(rotasReais).length) atualizarPaineis();
 }
 
 /* ---------- painéis ---------- */
@@ -1268,7 +1340,7 @@ function atualizarPaineis(){
     const alertas = g.filter(it=>it.nivel!=='ok').length;
     const link = linkRota(g);
     return `<details class="equipe"><summary><span class="dot" style="background:${CORES[e%CORES.length]}"></span>
-      <span class="nome">${esc(nomeEquipe(e))}</span><span class="meta">${g.length} OS · ${resumoEquipe(g).km} km · ${resumoEquipe(g).jornada}${alertas?' · '+alertas+'⚠':''}</span></summary>
+      <span class="nome">${esc(nomeEquipe(e))}</span><span class="meta">${(r=>`${g.length} OS · ${r.km} km${r.real?'':'*'} · ${r.jornada}`)(resumoEquipe(g,e))}${alertas?' · '+alertas+'⚠':''}</span></summary>
       ${g.map(it=>`<div class="parada" data-os="${esc(it.os)}"><span class="i">${it.ordem}</span>
         <span>${esc(it.cliente||it.endereco)}<br><span style="color:#7CA3A8;font-size:11px">${esc(it.endereco)}</span>
         ${it.janela?`<br><span style="color:#3FB6F0;font-size:11px">${esc(it.janela)}</span>`:''}
@@ -1321,12 +1393,19 @@ function atualizarPaineis(){
   }
 }
 
-function resumoEquipe(g){
-  const seq = cfg.base ? [{lat:cfg.base[0], lon:cfg.base[1]}, ...g] : g;
-  let km = 0;
-  for(let i=1;i<seq.length;i++) km += kmEntre(seq[i-1], seq[i]);
-  const min = km/velocidadeMedia()*60 + g.length*tempoPorOS();
-  return {km: km.toFixed(1), jornada: Math.floor(min/60) + 'h' + String(Math.round(min%60)).padStart(2,'0')};
+function resumoEquipe(g, e){
+  const real = (e !== undefined) ? rotasReais[e] : null;
+  let km, desloc;
+  if(real){ km = real.km; desloc = real.min; }
+  else{
+    const seq = cfg.base ? [{lat:cfg.base[0], lon:cfg.base[1]}, ...g] : g;
+    km = 0;
+    for(let i=1;i<seq.length;i++) km += kmEntre(seq[i-1], seq[i]);
+    desloc = km/velocidadeMedia()*60;
+  }
+  const min = desloc + g.length*tempoPorOS();
+  return {km: km.toFixed(1), real: !!real,
+          jornada: Math.floor(min/60) + 'h' + String(Math.round(min%60)).padStart(2,'0')};
 }
 
 function linkRota(g){
@@ -1648,7 +1727,7 @@ $('#fileBase').onchange = async e => {
     $('#statusImp').textContent = 'Base restaurada: ' + Object.keys(historico).length + ' dias.';
   }catch(err){ $('#statusImp').textContent = 'Não consegui ler esse arquivo de base.'; }
 };
-['#cfgCidade','#cfgChave','#cfgJanela','#cfgEquipes','#cfgDivisao','#cfgLimite','#cfgGoogle','#cfgTempoOS','#cfgVel','#dia'].forEach(s=> $(s).onchange = ()=>{ lerConfig(); Base.set(K_CFG,cfg); });
+['#cfgCidade','#cfgChave','#cfgJanela','#cfgEquipes','#cfgDivisao','#cfgLimite','#cfgGoogle','#cfgTempoOS','#cfgVel','#cfgRuas','#dia'].forEach(s=> $(s).onchange = ()=>{ lerConfig(); Base.set(K_CFG,cfg); });
 
 function lerConfig(){
   const antes = cfg.equipes;
@@ -1661,6 +1740,7 @@ function lerConfig(){
   cfg.googleKey = $('#cfgGoogle').value.trim();
   cfg.tempoOS = +$('#cfgTempoOS').value || 40;
   cfg.velocidade = +$('#cfgVel').value || 25;
+  cfg.ruas = $('#cfgRuas').value !== 'nao';
   desenharTecnicos();
   if(cfg.equipes !== antes) desenharNomes();
 }
@@ -1674,6 +1754,7 @@ function escreverConfig(){
   $('#cfgGoogle').value = cfg.googleKey||'';
   $('#cfgTempoOS').value = cfg.tempoOS||40;
   $('#cfgVel').value = cfg.velocidade||25;
+  $('#cfgRuas').value = cfg.ruas === false ? 'nao' : 'sim';
   desenharNomes();
   desenharTecnicos();
 }
