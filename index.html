@@ -228,7 +228,7 @@ select:focus,input:focus{border-color:var(--verde);outline:none}
 <header>
   <button id="btnMenu" aria-label="Abrir painel">☰</button>
   <img id="robo" src="assets/robo.png" alt="Direct">
-  <div class="brand">MAPA OS<small>distribuição diária · v8 · 31/07</small></div>
+  <div class="brand">MAPA OS<small>distribuição diária · v9 · 31/07</small></div>
   <div class="stats">
     <div class="chip"><b id="sTotal">0</b><span>OS</span></div>
     <div class="chip"><b id="sPlot">0</b><span>no mapa</span></div>
@@ -733,6 +733,12 @@ function carregarGoogle(chave){
   return googlePronto;
 }
 const PREC_GOOGLE = {ROOFTOP:'exata', RANGE_INTERPOLATED:'exata', GEOMETRIC_CENTER:'rua', APPROXIMATE:'bairro'};
+let googleBloqueado = false;
+const RECUSA = {
+  REQUEST_DENIED:'O Google recusou a consulta. Quase sempre é faturamento não vinculado ao projeto da chave.',
+  OVER_QUERY_LIMIT:'A cota da chave do Google estourou.',
+  ERROR:'Erro de comunicação com o Google.'
+};
 
 function buscarGoogle(it){
   const p = it.partes || {};
@@ -740,6 +746,7 @@ function buscarGoogle(it){
                  p.bairro, p.cidade, p.uf, p.cep].filter(Boolean).join(', ') + ', Brasil';
   return new Promise(ok=>{
     new google.maps.Geocoder().geocode({address:texto, region:'br'}, (res, status)=>{
+      if(RECUSA[status]) return ok({recusado:status});
       if(status !== 'OK' || !res || !res[0]) return ok(null);
       const g = res[0], loc = g.geometry.location;
       let prec = PREC_GOOGLE[g.geometry.location_type] || 'aproximada';
@@ -832,7 +839,13 @@ async function geocodificarTodos(){
       try{
         if(usarGoogle){
           r = await buscarGoogle(it);
-          await espera(120);
+          if(r && r.recusado){
+            googleBloqueado = true; usarGoogle = false; r = null;
+            aviso(RECUSA[ /* motivo */ 'REQUEST_DENIED' ] + ' Seguindo por OpenStreetMap e CEP — o caminho do My Maps voltou para a seção Revisar no mapa.');
+            atualizarPaineis();
+          } else {
+            await espera(120);
+          }
         }
         if(!r){
           const cep = await buscarCep((it.partes||{}).cep).catch(()=>null);
@@ -1298,7 +1311,8 @@ function animarNumero(sel, valor){
 
 function atualizarPaineis(){
   const vazio = $('#vazio'); if(vazio) vazio.style.display = itens.length ? 'none' : 'flex';
-  const mm = $('#blocoMyMaps'); if(mm) mm.style.display = (cfg.googleKey||'').trim() ? 'none' : 'block';
+  const mm = $('#blocoMyMaps');
+  if(mm) mm.style.display = ((cfg.googleKey||'').trim() && !googleBloqueado) ? 'none' : 'block';
   const comLocal = itens.filter(it=>it.lat);
   const rein = itens.filter(it=>it.nivel!=='ok');
   const falhas = itens.filter(it=>!it.lat);
@@ -1737,7 +1751,9 @@ function lerConfig(){
   cfg.equipes = +$('#cfgEquipes').value;
   cfg.divisao = $('#cfgDivisao').value;
   cfg.limiteOS = +$('#cfgLimite').value || 8;
+  const chaveAntes = cfg.googleKey;
   cfg.googleKey = $('#cfgGoogle').value.trim();
+  if(cfg.googleKey !== chaveAntes){ googleBloqueado = false; googlePronto = null; }
   cfg.tempoOS = +$('#cfgTempoOS').value || 40;
   cfg.velocidade = +$('#cfgVel').value || 25;
   cfg.ruas = $('#cfgRuas').value !== 'nao';
