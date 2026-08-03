@@ -1,0 +1,58 @@
+{
+  "gerado_em": "2026-08-02T08:00:00",
+  "periodo": "01/08/2026",
+  "ocorrencias": [
+    {
+      "os": "1273262111",
+      "tipo": "SUPORTE",
+      "cliente": "CLIENTE DEMO 01",
+      "tecnico": "TÉCNICO DEMO A",
+      "data_execucao": "01/08/2026 09:42",
+      "descricao_os": "Cliente relata lentidão constante no período da noite. Verificar sinal na ONU e cabeamento interno.",
+      "descricao_fechamento": "Realizada troca do cabo drop e reconectorização. Sinal normalizado em -18dBm. Cliente ciente e satisfeito.",
+      "fotos": [
+        {
+          "url": "https://placehold.co/900x1200/0E2B1D/6FD69B?text=Sinal+interno",
+          "rotulo": "Sinal interno"
+        },
+        {
+          "url": "https://placehold.co/1200x900/0E2B1D/6FD69B?text=MAC+do+equipamento",
+          "rotulo": "MAC"
+        },
+        {
+          "url": "https://placehold.co/900x1200/0E2B1D/6FD69B?text=Teste+de+velocidade",
+          "rotulo": "Velocidade"
+        }
+      ]
+    },
+    {
+      "os": "1273262112",
+      "tipo": "TROCA EQUIP",
+      "cliente": "CLIENTE DEMO 02",
+      "tecnico": "TÉCNICO DEMO A",
+      "data_execucao": "01/08/2026 11:05",
+      "descricao_os": "ONT sem sinal, LED vermelho. Cliente sem conexão desde ontem.",
+      "descricao_fechamento": "Substituída ONT com defeito. Equipamento antigo recolhido. Testado e funcionando.",
+      "fotos": [
+        {
+          "url": "https://placehold.co/1200x900/0E2B1D/6FD69B?text=MAC+antigo",
+          "rotulo": "MAC antigo"
+        },
+        {
+          "url": "https://placehold.co/1200x900/0E2B1D/6FD69B?text=MAC+novo",
+          "rotulo": "MAC novo"
+        }
+      ]
+    },
+    {
+      "os": "1273262113",
+      "tipo": "SUPORTE",
+      "cliente": "CLIENTE DEMO 03",
+      "tecnico": "TÉCNICO DEMO B",
+      "data_execucao": "01/08/2026 14:20",
+      "descricao_os": "Sem conexão. Cliente informa que houve poda de árvore na rua.",
+      "descricao_fechamento": "Cliente ausente no horário agendado. Contato por telefone sem retorno.",
+      "fotos": []
+    }
+  ]
+}
