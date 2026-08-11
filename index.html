@@ -705,6 +705,15 @@ input.macOk{border-color:var(--esm3)!important}
 .prodNota.media{color:var(--amb)} .prodNota.baixa{color:var(--erro)}
 .prodQtd{font-size:10.5px;color:var(--mut);text-align:right;font-variant-numeric:tabular-nums}
 
+
+.eqBloco{background:rgba(0,0,0,.2);border:1px solid var(--borda2);border-radius:14px;
+  padding:13px 15px;margin-bottom:10px}
+.eqBlocoCab{display:flex;align-items:center;gap:10px;margin-bottom:2px;
+  font-size:11.5px;color:var(--esm2);font-weight:500}
+.eqBlocoCab button{margin-left:auto;background:none;border:0;color:var(--mut);
+  font-size:11px;font-family:var(--ui);padding:2px 4px}
+.eqBlocoCab button:hover{color:var(--erro)}
+
 /* ---------- estado vazio ---------- */
 #vazio{position:absolute;inset:0;z-index:395;pointer-events:none;display:flex;
   flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px}
@@ -5316,8 +5325,11 @@ function desenharEstoque(){
       </div>
       <p class="eqTrecho">${destacarSinais(t.deteccao.trecho)}</p>
       ${c ? `<p class="eqTrecho" style="border-left-color:var(--esm2)">
-        <b>${esc(c.modelo)}</b> · MAC ${esc(c.mac)} · serial ${esc(c.serial)}
-        ${c.identificador ? ' · id ' + esc(c.identificador) : ''}</p>` : ''}
+        ${(c.equipamentos || [c]).map(e=>
+          `<b>${esc(e.modelo)}</b> · MAC ${esc(e.mac)} · série ${esc(e.serial)}` +
+          (e.identificador ? ' · bloco ' + esc(e.identificador) : '') +
+          (e.instalado ? '<br><span style="color:var(--mut)">→ substituído por ' + esc(e.instalado) + '</span>' : '')
+        ).join('<br>')}</p>` : ''}
       ${(t.passos && t.passos.length) ? `<div class="eqProgresso">${t.passos.map(p=>
         `<div class="passo ${esc(p.estado||'')}">${esc(p.texto)}</div>`).join('')}</div>` : ''}
       <div class="eqAcoes">
@@ -5340,13 +5352,25 @@ function desenharEstoque(){
 /* ---------- formulário ---------- */
 let equipAtual = null;
 
+let equipRascunho = [];   // equipamentos sendo cadastrados nesta ordem
+
 function abrirCadastroEquip(i){
   equipAtual = i;
   const t = trocasEstoque[i];
-  const c = t.cadastro || {};
+  const salvos = t.cadastro ? (t.cadastro.equipamentos || [t.cadastro]) : [];
+  equipRascunho = salvos.length ? salvos.map(e => ({...e})) : [{}];
+
+  const tagAtual = (t.cadastro && t.cadastro.tag) ||
+    (t.deteccao.tipo === 'retirada' ? 'RETORNO CANCELAMENTO' : 'RETORNO TROCA');
+  const obs = (t.cadastro && t.cadastro.obs) || observacaoPadrao(t);
+
   $('#equipSub').textContent = 'Equipamento retirado na OS ' + t.os + ' · ' + (t.cliente || 'sem nome');
 
   $('#equipCorpo').innerHTML = `
+    <p class="eqDica" style="margin:0 0 12px">Os dados abaixo são do que foi
+      <b>retirado do cliente</b>. Tudo será cadastrado, vinculado ao assinante de origem
+      e retornado ao estoque de <b>correção de comodato</b>.</p>
+
     <div class="eqDados">
       <div class="campo"><label>Cliente</label><span>${esc(t.cliente || '—')}</span></div>
       <div class="campo"><label>Contrato</label><span>${esc(t.contrato || '—')}</span></div>
@@ -5354,56 +5378,138 @@ function abrirCadastroEquip(i){
       <div class="campo"><label>Plano</label><span>${esc(t.plano || '—')}</span></div>
     </div>
 
-    <p class="eqDica" style="margin:0 0 12px">Os dados abaixo são do equipamento
-      <b>retirado do cliente</b>. Ele será cadastrado, vinculado ao assinante de origem
-      e retornado ao estoque de <b>correção de comodato</b>.</p>
-
-    <label class="f">Modelo do equipamento retirado *</label>
-    <div class="buscaEquip">
-      <input type="text" id="eqModelo" autocomplete="off" spellcheck="false"
-             value="${esc(c.modelo || '')}" placeholder="digite parte do nome — busca nos ${EQUIPAMENTOS.length} cadastrados">
-      <div class="sugestoes"></div>
-    </div>
-
-    <label class="f">MAC Address *</label>
-    <input type="text" id="eqMac" value="${esc(c.mac || '')}" placeholder="AA:BB:CC:DD:EE:FF"
-           autocomplete="off" spellcheck="false" maxlength="17">
-    <p class="eqDica" id="eqMacDica">Somente 0-9 e A-F. A formatação é automática.</p>
-
-    <label class="f">Número de série *</label>
-    <input type="text" id="eqSerial" value="${esc(c.serial || '')}"
-           autocomplete="off" spellcheck="false" style="text-transform:uppercase">
-
-    <label class="f">Identificador próprio / código do bloco</label>
-    <input type="text" id="eqIdent" value="${esc(c.identificador || '')}"
-           autocomplete="off" spellcheck="false" placeholder="opcional">
+    <div id="eqLista"></div>
+    <button class="escAdd" id="eqAdicionar" type="button">+ Adicionar outro equipamento</button>
 
     <label class="f">Motivo do retorno *</label>
     <select id="eqTag">
-      <option value="RETORNO TROCA"${(c.tag || (t.deteccao.tipo === 'retirada' ? 'RETORNO CANCELAMENTO' : 'RETORNO TROCA')) === 'RETORNO TROCA' ? ' selected' : ''}>RETORNO TROCA — substituído por outro</option>
-      <option value="RETORNO CANCELAMENTO"${(c.tag || (t.deteccao.tipo === 'retirada' ? 'RETORNO CANCELAMENTO' : '')) === 'RETORNO CANCELAMENTO' ? ' selected' : ''}>RETORNO CANCELAMENTO — recolhido sem reposição</option>
+      <option value="RETORNO TROCA"${tagAtual === 'RETORNO TROCA' ? ' selected' : ''}>RETORNO TROCA — substituído por outro</option>
+      <option value="RETORNO CANCELAMENTO"${tagAtual === 'RETORNO CANCELAMENTO' ? ' selected' : ''}>RETORNO CANCELAMENTO — recolhido sem reposição</option>
     </select>
-    <p class="eqDica">Vira a tag da movimentação no HubSoft.</p>
 
     <label class="f">Observações que vão para o HubSoft</label>
     <textarea id="eqObs" rows="3" style="width:100%;background:rgba(0,0,0,.28);border:1px solid var(--borda2);
       border-radius:12px;padding:10px 13px;color:var(--txt);font-family:var(--ui);font-size:13px;resize:vertical"
-      >${esc(c.obs || observacaoPadrao(t))}</textarea>
-    <p class="eqDica">Preenchida com a origem do equipamento. Ajuste se precisar.</p>`;
+      >${esc(obs)}</textarea>`;
 
-  ligarAutocomplete($('#eqModelo'));
-
-  const mac = $('#eqMac');
-  mac.oninput = ()=>{
-    const fim = mac.selectionStart === mac.value.length;
-    mac.value = formatarMac(mac.value);
-    if(fim) mac.setSelectionRange(mac.value.length, mac.value.length);
-    validarMacAoVivo();
+  desenharEquipamentos();
+  $('#eqAdicionar').onclick = ()=>{
+    if(equipRascunho.length >= 4){ aviso('Quatro equipamentos por ordem é o limite.'); return; }
+    guardarRascunho();
+    equipRascunho.push({});
+    desenharEquipamentos();
   };
-  validarMacAoVivo();
 
   $('#modalEquip').hidden = false;
-  $('#eqModelo').focus();
+  const p1 = $('#equipCorpo').querySelector('input');
+  if(p1) p1.focus();
+}
+
+/* Cada equipamento vira um bloco. O tipo separa roteador/ONT de ONU,
+   que na planilha do setor ocupam colunas diferentes. */
+function desenharEquipamentos(){
+  const alvo = $('#eqLista');
+  alvo.innerHTML = equipRascunho.map((e,i)=>`
+    <div class="eqBloco" data-eq-i="${i}">
+      <div class="eqBlocoCab">
+        <span>Equipamento ${i+1}${i === 0 ? '' : ' (opcional)'}</span>
+        ${equipRascunho.length > 1 ? `<button type="button" data-remover="${i}">remover</button>` : ''}
+      </div>
+
+      <label class="f">Modelo retirado *</label>
+      <div class="buscaEquip">
+        <input type="text" data-campo="modelo" data-i="${i}" autocomplete="off" spellcheck="false"
+               value="${esc(e.modelo || '')}" placeholder="digite parte do nome do equipamento">
+        <div class="sugestoes"></div>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <label class="f">MAC *</label>
+          <input type="text" data-campo="mac" data-i="${i}" value="${esc(e.mac || '')}"
+                 placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" spellcheck="false" maxlength="17">
+        </div>
+        <div>
+          <label class="f">Número de série *</label>
+          <input type="text" data-campo="serial" data-i="${i}" value="${esc(e.serial || '')}"
+                 autocomplete="off" spellcheck="false" style="text-transform:uppercase">
+        </div>
+      </div>
+      <p class="eqDica" data-dica="${i}">Somente 0-9 e A-F no MAC. A formatação é automática.</p>
+
+      <div class="grid2">
+        <div>
+          <label class="f">Código do bloco</label>
+          <input type="text" data-campo="identificador" data-i="${i}" value="${esc(e.identificador || '')}"
+                 autocomplete="off" spellcheck="false" placeholder="opcional">
+        </div>
+        <div>
+          <label class="f">Tipo</label>
+          <select data-campo="categoria" data-i="${i}">
+            <option value="rot"${(e.categoria || 'rot') === 'rot' ? ' selected' : ''}>Roteador / ONT</option>
+            <option value="onu"${e.categoria === 'onu' ? ' selected' : ''}>ONU</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="f">Substituído por</label>
+      <div class="buscaEquip">
+        <input type="text" data-campo="instalado" data-i="${i}" autocomplete="off" spellcheck="false"
+               value="${esc(e.instalado || '')}"
+               placeholder="o que ficou no cliente — vazio se não houve reposição">
+        <div class="sugestoes"></div>
+      </div>
+    </div>`).join('');
+
+  alvo.querySelectorAll('[data-campo="modelo"], [data-campo="instalado"]')
+      .forEach(inp => ligarAutocomplete(inp));
+
+  alvo.querySelectorAll('[data-campo="mac"]').forEach(inp=>{
+    inp.oninput = ()=>{
+      const noFim = inp.selectionStart === inp.value.length;
+      inp.value = formatarMac(inp.value);
+      if(noFim) inp.setSelectionRange(inp.value.length, inp.value.length);
+      validarMacBloco(+inp.dataset.i);
+    };
+    validarMacBloco(+inp.dataset.i);
+  });
+
+  alvo.querySelectorAll('[data-remover]').forEach(b=> b.onclick = ()=>{
+    guardarRascunho();
+    equipRascunho.splice(+b.dataset.remover, 1);
+    desenharEquipamentos();
+  });
+}
+
+function guardarRascunho(){
+  document.querySelectorAll('#eqLista [data-campo]').forEach(inp=>{
+    const i = +inp.dataset.i;
+    equipRascunho[i] = equipRascunho[i] || {};
+    equipRascunho[i][inp.dataset.campo] = inp.value.trim();
+    if(inp.dataset.campo === 'modelo' && inp.dataset.codigo)
+      equipRascunho[i].codigo = inp.dataset.codigo;
+    if(inp.dataset.campo === 'instalado' && inp.dataset.codigo)
+      equipRascunho[i].instaladoCod = inp.dataset.codigo;
+  });
+}
+
+function validarMacBloco(i){
+  const inp = document.querySelector(`#eqLista [data-campo="mac"][data-i="${i}"]`);
+  const dica = document.querySelector(`#eqLista [data-dica="${i}"]`);
+  if(!inp || !dica) return;
+  const v = inp.value.trim();
+  inp.classList.remove('macOk', 'macRuim');
+  if(!v){ dica.className = 'eqDica'; dica.textContent = 'Somente 0-9 e A-F no MAC. A formatação é automática.'; return; }
+  if(macValido(v)){
+    inp.classList.add('macOk');
+    dica.className = 'eqDica';
+    dica.textContent = 'MAC válido.';
+  } else {
+    inp.classList.add('macRuim');
+    dica.className = 'eqDica erro';
+    const faltam = 12 - v.replace(/[^0-9A-Fa-f]/g, '').length;
+    dica.textContent = faltam > 0 ? 'Faltam ' + faltam + ' caracteres no MAC.' : 'MAC inválido.';
+  }
 }
 
 /* O HubSoft aceita a observação livre; o setor pediu que ela conte
@@ -5436,20 +5542,40 @@ function validarMacAoVivo(){
 
 function salvarCadastroEquip(){
   const t = trocasEstoque[equipAtual];
-  const modelo = $('#eqModelo').value.trim();
-  const mac = $('#eqMac').value.trim();
-  const serial = $('#eqSerial').value.trim().toUpperCase();
+  if(!t) return;
+  guardarRascunho();
 
-  if(!modelo){ aviso('Escolha o modelo do equipamento.'); $('#eqModelo').focus(); return; }
-  if(!macValido(mac)){ aviso('O MAC precisa ter 12 caracteres hexadecimais.'); $('#eqMac').focus(); return; }
-  if(!serial){ aviso('Informe o número de série.'); $('#eqSerial').focus(); return; }
+  const validos = [];
+  for(let i = 0; i < equipRascunho.length; i++){
+    const e = equipRascunho[i];
+    if(!e.modelo && !e.mac && !e.serial && i > 0) continue;   // bloco extra vazio
+
+    if(!e.modelo){ aviso('Equipamento ' + (i+1) + ': escolha o modelo retirado.'); return; }
+    if(!macValido(e.mac || '')){ aviso('Equipamento ' + (i+1) + ': o MAC precisa ter 12 caracteres hexadecimais.'); return; }
+    if(!e.serial){ aviso('Equipamento ' + (i+1) + ': informe o número de série.'); return; }
+    validos.push({
+      modelo: e.modelo, mac: e.mac, serial: (e.serial || '').toUpperCase(),
+      codigo: e.codigo || null, identificador: e.identificador || '',
+      categoria: e.categoria || 'rot',
+      instalado: e.instalado || '', instaladoCod: e.instaladoCod || null
+    });
+  }
+  if(!validos.length){ aviso('Preencha ao menos um equipamento.'); return; }
+
+  // MAC repetido entre blocos costuma ser cópia sem querer
+  const macs = validos.map(e => e.mac);
+  if(new Set(macs).size !== macs.length){
+    aviso('Há dois equipamentos com o mesmo MAC. Confira as etiquetas.');
+    return;
+  }
 
   t.cadastro = {
-    modelo, mac, serial,
-    codigo: ($('#eqModelo').dataset.codigo) || null,
-    identificador: $('#eqIdent').value.trim(),
+    equipamentos: validos,
     tag: $('#eqTag').value,
     obs: $('#eqObs').value.trim(),
+    // o primeiro fica no topo, por compatibilidade
+    modelo: validos[0].modelo, mac: validos[0].mac, serial: validos[0].serial,
+    identificador: validos[0].identificador, codigo: validos[0].codigo
   };
   t.estado = 'pronto';
   $('#modalEquip').hidden = true;
@@ -5509,20 +5635,36 @@ async function enviarCadastro(i){
 }
 
 /* ---------- planilha de trocas e retiradas ---------- */
-function linhaDeTroca(t){
+/* Uma linha por ordem, no formato da planilha de trocas do setor:
+   roteador e ONU em colunas separadas, com o que entrou no lugar. */
+function linhasDeTroca(t){
   const c = t.cadastro || {};
-  return {
-    data: t.data, os: t.os, tecnico: t.tecnico, cliente: t.cliente, endereco: t.endereco,
-    retirado: c.modelo, mac: c.mac, serial: c.serial,
-    identificador: c.identificador || '', instalado: c.modelo,
-    plano: t.plano, tag: c.tag || '', contrato: t.contrato,
-  };
+  const equipamentos = c.equipamentos || [c];
+  const rot = equipamentos.find(e => (e.categoria || 'rot') === 'rot');
+  const onu = equipamentos.find(e => e.categoria === 'onu');
+
+  return [{
+    data: t.data,
+    cliente: t.cliente,
+    tipo: t.deteccao ? (t.deteccao.tipo === 'retirada' ? 'RETIRADA' : 'TROCA EQUIP') : '',
+    tecnico: t.tecnico,
+    rot_retirado: rot ? rot.modelo : '-',
+    rot_bloco: rot ? (rot.identificador || '-') : '-',
+    onu_retirada: onu ? onu.modelo : '-',
+    onu_bloco: onu ? (onu.identificador || '-') : '-',
+    qtd: equipamentos.length,
+    plano: t.plano || '-',
+    rot_instalado: rot ? (rot.instalado || '-') : '-',
+    onu_instalada: onu ? (onu.instalado || '-') : '-',
+    macs: equipamentos.map(e => e.modelo + ' ' + e.mac + ' / ' + e.serial).join(' | '),
+    os: t.os, contrato: t.contrato, tag: c.tag || ''
+  }];
 }
 
 async function registrarTrocaNaPlanilha(t){
   if(!syncLigado()) return;
   try{
-    await syncEnviar({trocas_estoque: [linhaDeTroca(t)]});
+    await syncEnviar({trocas_estoque: linhasDeTroca(t)});
     anotarPasso(t, 'Registrado na planilha de trocas.', 'ok');
   }catch(e){
     anotarPasso(t, 'Cadastrado no HubSoft, mas falhou ao gravar na planilha: ' + e.message, 'erro');
@@ -5532,13 +5674,13 @@ async function registrarTrocaNaPlanilha(t){
 function exportarTrocasEstoque(){
   const prontas = trocasEstoque.filter(t => t.cadastro);
   if(!prontas.length){ $('#estoqueStatus').textContent = 'Nenhum equipamento cadastrado ainda.'; return; }
-  const cab = ['DATA','O.S','TÉCNICO','CLIENTE','ENDEREÇO','EQUIPAMENTO RETIRADO','MAC',
-               'SERIAL','IDENTIFICADOR PRÓPRIO','EQUIPAMENTO INSTALADO','PLANO','TAG','CONTRATO'];
-  const linhas = prontas.map(t=>{
-    const l = linhaDeTroca(t);
-    return [l.data, l.os, l.tecnico, l.cliente, l.endereco, l.retirado, l.mac,
-            l.serial, l.identificador, l.instalado, l.plano, l.tag, l.contrato];
-  });
+  const cab = ['DATA','CLIENTE','TIPO DE O.S','TÉCNICO','ROTEADOR / ONT RETIRADO',
+               'CÓD. DO BLOCO ROT / ONT','ONU RETIRADA','CÓD. DO BLOCO ONU','QTD','PLANO',
+               'INSTALADO ROT / ONT','INSTALADO ONU','SERIAIS E MACS','O.S'];
+  const linhas = prontas.flatMap(t => linhasDeTroca(t).map(l =>
+    [l.data, l.cliente, l.tipo, l.tecnico, l.rot_retirado, l.rot_bloco,
+     l.onu_retirada, l.onu_bloco, l.qtd, l.plano, l.rot_instalado, l.onu_instalada,
+     l.macs, l.os]));
   const csv = '\ufeff' + [cab, ...linhas]
     .map(l => l.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
   baixar('trocas-estoque-' + new Date().toISOString().slice(0,10) + '.csv', csv, 'text/csv;charset=utf-8');
