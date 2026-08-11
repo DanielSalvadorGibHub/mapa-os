@@ -4720,7 +4720,7 @@ function abrirTroca(){
   if(primeiro) primeiro.focus();
 }
 
-function ligarAutocomplete(inp){
+function ligarAutocomplete(inp, aoEscolher){
   const caixa = inp.parentElement.querySelector('.sugestoes');
   let sel = -1;
   const fechar = ()=>{ caixa.innerHTML = ''; sel = -1; };
@@ -4732,6 +4732,7 @@ function ligarAutocomplete(inp){
       '<div data-i="'+i+'">'+esc(e[1])+'<small>código '+esc(e[0])+'</small></div>').join('');
     caixa.querySelectorAll('div[data-i]').forEach((d,i)=> d.onclick = ()=>{
       inp.value = achados[i][1]; inp.dataset.codigo = achados[i][0]; fechar();
+      if(aoEscolher) aoEscolher(achados[i][0], achados[i][1]);
     });
     sel = -1;
   };
@@ -5441,7 +5442,7 @@ function desenharEquipamentos(){
         <div>
           <label class="f">Código do bloco</label>
           <input type="text" data-campo="identificador" data-i="${i}" value="${esc(e.identificador || '')}"
-                 autocomplete="off" spellcheck="false" placeholder="opcional">
+                 autocomplete="off" spellcheck="false" placeholder="vem do equipamento">
         </div>
         <div>
           <label class="f">Tipo</label>
@@ -5461,8 +5462,22 @@ function desenharEquipamentos(){
       </div>
     </div>`).join('');
 
-  alvo.querySelectorAll('[data-campo="modelo"], [data-campo="instalado"]')
-      .forEach(inp => ligarAutocomplete(inp));
+  // o código na lista de equipamentos é o bloco: preenche sozinho ao escolher
+  alvo.querySelectorAll('[data-campo="modelo"]').forEach(inp=>{
+    ligarAutocomplete(inp, (codigo, nome)=>{
+      const i = inp.dataset.i;
+      const bloco = alvo.querySelector(`[data-campo="identificador"][data-i="${i}"]`);
+      if(bloco && !bloco.value.trim()){
+        bloco.value = codigo;
+        bloco.classList.add('preenchidoAuto');
+        setTimeout(()=> bloco.classList.remove('preenchidoAuto'), 1400);
+      }
+      // ONU e roteador ocupam colunas diferentes na planilha do setor
+      const tipo = alvo.querySelector(`[data-campo="categoria"][data-i="${i}"]`);
+      if(tipo) tipo.value = (/\bONU\b/i.test(nome) && !/\bONT\b/i.test(nome)) ? 'onu' : 'rot';
+    });
+  });
+  alvo.querySelectorAll('[data-campo="instalado"]').forEach(inp => ligarAutocomplete(inp));
 
   alvo.querySelectorAll('[data-campo="mac"]').forEach(inp=>{
     inp.oninput = ()=>{
