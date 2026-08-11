@@ -714,6 +714,82 @@ input.macOk{border-color:var(--esm3)!important}
   font-size:11px;font-family:var(--ui);padding:2px 4px}
 .eqBlocoCab button:hover{color:var(--erro)}
 
+
+/* ---------- desenho de território ---------- */
+#map.desenhando{cursor:crosshair}
+#map.desenhando .leaflet-marker-icon{cursor:crosshair}
+#painelDesenho{position:absolute;top:80px;left:26px;z-index:700;width:250px;
+  background:rgba(9,32,22,.96);border:1px solid var(--borda);border-radius:20px;
+  padding:16px 18px;box-shadow:var(--sombra);backdrop-filter:blur(20px)}
+#painelDesenho[hidden]{display:none}
+.dsCab{display:flex;align-items:center;margin-bottom:12px}
+.dsCab b{font-size:13.5px;font-weight:600}
+#dsFechar{margin-left:auto;background:var(--v1);border:1px solid var(--borda2);
+  border-radius:50%;width:26px;height:26px;color:var(--txt2);font-size:12px}
+#dsFechar:hover{background:var(--v2);color:var(--erro)}
+.dsContador{text-align:center;padding:12px 0;background:rgba(47,169,110,.10);
+  border:1px solid rgba(111,214,155,.25);border-radius:14px;margin-bottom:11px}
+#dsContagem{display:block;font-size:32px;font-weight:600;color:var(--esm1);
+  line-height:1;font-variant-numeric:tabular-nums}
+.dsContador small{font-size:10.5px;color:var(--mut);display:block;margin-top:4px}
+.dsDica{font-size:11.5px;color:var(--mut);line-height:1.5;margin:0 0 12px}
+.dsAcoes{display:flex;flex-direction:column;gap:7px}
+.dsAcoes button{background:var(--v1);border:1px solid var(--borda2);border-radius:12px;
+  padding:9px;color:var(--txt2);font-size:12px;font-family:var(--ui);transition:.15s}
+.dsAcoes button:hover:not(:disabled){background:var(--v2);color:var(--esm1)}
+.dsAcoes button.principal{background:linear-gradient(180deg,var(--esm2),var(--esm3));
+  color:#03150D;border-color:transparent;font-weight:500}
+.dsAcoes button:disabled{opacity:.4;cursor:default}
+#dsEscolha{margin-top:13px;padding-top:13px;border-top:1px solid var(--borda2)}
+#dsEscolha[hidden]{display:none}
+.dsTitulo{margin:0;font-size:13px;font-weight:600;color:var(--esm1)}
+.dsSub{margin:3px 0 9px;font-size:11.5px;color:var(--mut)}
+.dsTecnicos{display:flex;flex-direction:column;gap:5px;max-height:210px;overflow-y:auto}
+.dsTecnicos button{display:flex;align-items:center;gap:9px;background:var(--v1);
+  border:1px solid var(--borda2);border-radius:11px;padding:8px 12px;color:var(--txt2);
+  font-size:12px;font-family:var(--ui);text-align:left;transition:.15s}
+.dsTecnicos button:hover{background:var(--v2);color:var(--txt);border-color:var(--c)}
+.dsPonto{width:10px;height:10px;border-radius:50%;background:var(--c);flex:0 0 auto}
+.dsOutro{width:100%;margin-top:7px;background:none;border:1px dashed var(--borda);
+  border-radius:11px;padding:8px;color:var(--mut);font-size:11.5px;font-family:var(--ui)}
+.dsOutro:hover{color:var(--esm1);border-color:var(--esm3)}
+
+.rotuloTerritorio span{background:rgba(9,32,22,.9);border:1px solid var(--c);color:var(--c);
+  border-radius:999px;padding:3px 11px;font:600 11px/1 var(--ui);white-space:nowrap;
+  display:inline-flex;gap:7px;align-items:center;transform:translate(-50%,-50%)}
+.rotuloTerritorio b{background:var(--c);color:#03150D;border-radius:999px;padding:1px 6px;font-size:10px}
+
+/* lista de territórios no menu */
+.terr{background:var(--v1);border:1px solid var(--borda2);border-radius:14px;
+  padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.terr:hover{border-color:var(--borda);background:var(--v2)}
+.terrCab{display:flex;align-items:center;gap:9px;font-size:13px}
+.terrDot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+.terrN{margin-left:auto;background:rgba(0,0,0,.3);border-radius:999px;padding:2px 10px;
+  font-size:11.5px;color:var(--txt2);font-variant-numeric:tabular-nums}
+.terrCab button{background:none;border:0;color:var(--mut);font-size:12px;padding:0 2px}
+.terrCab button:hover{color:var(--erro)}
+.terrInfo{font-size:11px;color:var(--mut);margin-top:4px}
+.terrLista{display:flex;flex-direction:column;gap:2px;margin-top:8px;
+  font-size:11.5px;color:var(--txt2);max-height:150px;overflow-y:auto}
+
+/* ---------- aglomerações ---------- */
+.seloAglom span{background:rgba(58,20,24,.9);border:1px solid rgba(232,115,127,.5);
+  color:var(--erro);border-radius:999px;padding:3px 11px;font:600 10.5px/1 var(--ui);
+  white-space:nowrap;transform:translate(-50%,-50%);display:inline-block}
+.aglom{background:rgba(232,115,127,.07);border:1px solid rgba(232,115,127,.22);
+  border-radius:14px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.aglom:hover{background:rgba(232,115,127,.12);border-color:rgba(232,115,127,.35)}
+.aglomCab{display:flex;align-items:baseline;gap:8px}
+.aglomCab b{font-size:13.5px;color:var(--erro)}
+.aglomCab span{font-size:11px;color:var(--mut)}
+.aglomSub{font-size:11.5px;color:var(--txt2);margin-top:3px}
+.aglomAlerta{font-size:11px;color:var(--amb);margin-top:5px;line-height:1.45}
+
+@media(max-width:820px){
+  #painelDesenho{left:12px;right:12px;width:auto;top:70px}
+}
+
 /* ---------- estado vazio ---------- */
 #vazio{position:absolute;inset:0;z-index:395;pointer-events:none;display:flex;
   flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px}
@@ -861,6 +937,48 @@ input.macOk{border-color:var(--esm3)!important}
       <button class="btn ghost" id="btnBase">Marcar no mapa</button>
       <button class="btn" id="btnEscala" style="margin-top:12px">Escalar equipe do dia</button>
       <button class="btn ghost" id="btnRecalc" style="margin-top:9px">Recalcular rotas</button>
+    </div>
+  </section>
+
+  <!-- 4a. territórios desenhados à mão -->
+  <section class="sec open" data-sec>
+    <h2>Territórios <span class="cnt" id="cntTerr"></span><span class="seta"></span></h2>
+    <div class="body">
+      <p class="hint" style="margin-top:2px">Trace uma área no mapa e diga quem atende.
+        A contagem de ocorrências aparece enquanto você desenha.</p>
+      <div class="row"><button class="btn" id="btnDesenhar">Desenhar área no mapa</button></div>
+      <div class="row"><button class="btn ghost" id="btnLimparTerr">Limpar territórios</button></div>
+      <div id="listaTerritorios"></div>
+    </div>
+  </section>
+
+  <!-- 4c. aglomerações -->
+  <section class="sec" data-sec>
+    <h2>Clientes aglomerados <span class="cnt" id="cntAglom"></span><span class="seta"></span></h2>
+    <div class="body">
+      <p class="hint" style="margin-top:2px">Vários chamados a poucos metros costumam
+        indicar CTO com problema ou rompimento no mesmo trecho.</p>
+      <div class="grid2">
+        <div>
+          <label class="f">Distância entre eles</label>
+          <select id="aglomRaio">
+            <option value="0.2">até 200 m</option>
+            <option value="0.35" selected>até 350 m</option>
+            <option value="0.6">até 600 m</option>
+            <option value="1">até 1 km</option>
+          </select>
+        </div>
+        <div>
+          <label class="f">Mínimo de clientes</label>
+          <select id="aglomMin">
+            <option value="3">3 ou mais</option>
+            <option value="4" selected>4 ou mais</option>
+            <option value="6">6 ou mais</option>
+          </select>
+        </div>
+      </div>
+      <label class="linha"><input type="checkbox" id="cfgAglomerar" checked> Marcar no mapa</label>
+      <div id="listaAglom"></div>
     </div>
   </section>
 
@@ -1181,6 +1299,23 @@ input.macOk{border-color:var(--esm3)!important}
         <button class="btn" id="escalaConfirmar">Ver no mapa</button>
       </div>
     </div>
+  </div>
+
+  <div id="painelDesenho" hidden>
+    <div class="dsCab">
+      <b>Desenhar território</b>
+      <button id="dsFechar" aria-label="Sair do desenho">✕</button>
+    </div>
+    <div class="dsContador">
+      <span id="dsContagem">0</span>
+      <small>ocorrências dentro da área</small>
+    </div>
+    <p class="dsDica" id="dsDica">Clique no mapa para marcar os cantos da área.</p>
+    <div class="dsAcoes">
+      <button id="dsDesfazer">Desfazer ponto</button>
+      <button id="dsDesignar" class="principal" disabled>Designar técnico</button>
+    </div>
+    <div id="dsEscolha" hidden></div>
   </div>
 
   <div id="modalEquip" hidden>
@@ -2936,6 +3071,8 @@ function desenharTudo(){
   if(lote.length) L.layerGroup(lote).addTo(camadas.marcadores);
 
   desenharTerritorios(comLocal);
+  atualizarAglomeracoes();
+  const ct = $('#cntTerr'); if(ct) ct.textContent = territorios.length || '';
   rotasReais = {};
   medirRotas();
 
@@ -5538,23 +5675,6 @@ function observacaoPadrao(t){
   ].filter(Boolean).join(' | ');
 }
 
-function validarMacAoVivo(){
-  const el = $('#eqMac'), dica = $('#eqMacDica');
-  const v = el.value.trim();
-  el.classList.remove('macOk', 'macRuim');
-  if(!v){ dica.className = 'eqDica'; dica.textContent = 'Somente 0-9 e A-F. A formatação é automática.'; return; }
-  if(macValido(v)){
-    el.classList.add('macOk');
-    dica.className = 'eqDica';
-    dica.textContent = 'MAC válido.';
-  } else {
-    el.classList.add('macRuim');
-    dica.className = 'eqDica erro';
-    const faltam = 12 - v.replace(/[^0-9A-Fa-f]/g, '').length;
-    dica.textContent = faltam > 0 ? 'Faltam ' + faltam + ' caracteres.' : 'MAC inválido.';
-  }
-}
-
 function salvarCadastroEquip(){
   const t = trocasEstoque[equipAtual];
   if(!t) return;
@@ -5864,6 +5984,355 @@ async function atualizarProdutividade(abrirDepois){
   return a;
 }
 
+/* ===========================================================
+   Desenho de território no mapa
+
+   O gestor traça um polígono sobre o mapa e designa quem atende
+   aquela região. É mais direto do que confiar no agrupamento
+   automático quando ele conhece a cidade.
+   =========================================================== */
+let desenhando = false;
+let vertices = [];              // [[lat, lon], ...] do polígono em curso
+let linhaTemp = null, areaTemp = null, marcasTemp = [];
+let territorios = [];           // [{nome, cor, poligono, os:[...]}]
+
+/* Ray casting: conta quantas vezes uma reta horizontal cruza as
+   arestas. Ímpar = dentro. Funciona com polígono côncavo. */
+function pontoDentro(p, poly){
+  let dentro = false;
+  for(let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    const [yi, xi] = poly[i], [yj, xj] = poly[j];
+    if(((yi > p[0]) !== (yj > p[0])) &&
+       (p[1] < (xj - xi) * (p[0] - yi) / (yj - yi) + xi)) dentro = !dentro;
+  }
+  return dentro;
+}
+
+function osDentroDe(poly){
+  if(!poly || poly.length < 3) return [];
+  return itens.filter(it => it.lat && pontoDentro([it.lat, it.lon], poly));
+}
+
+function iniciarDesenho(){
+  if(!itens.length){ aviso('Carregue a planilha do dia antes de desenhar territórios.'); return; }
+  desenhando = true;
+  vertices = [];
+  limparTemporario();
+  $('#map').classList.add('desenhando');
+  mostrarPainelDesenho();
+  mapa.on('click', cliqueDesenho);
+  mapa.doubleClickZoom.disable();
+  mapa.on('dblclick', fecharDesenho);
+}
+
+function cliqueDesenho(e){
+  vertices.push([e.latlng.lat, e.latlng.lng]);
+  redesenharTemporario();
+}
+
+function redesenharTemporario(){
+  if(linhaTemp) mapa.removeLayer(linhaTemp);
+  if(areaTemp) mapa.removeLayer(areaTemp);
+  marcasTemp.forEach(m => mapa.removeLayer(m));
+  marcasTemp = [];
+
+  if(vertices.length >= 2){
+    linhaTemp = L.polyline(vertices, {color:'#6FD69B', weight:2.5, dashArray:'6 5', opacity:.9}).addTo(mapa);
+  }
+  if(vertices.length >= 3){
+    areaTemp = L.polygon(vertices, {color:'#6FD69B', weight:1, fillColor:'#2FA96E',
+                                    fillOpacity:.12, opacity:.5}).addTo(mapa);
+  }
+  vertices.forEach((v,i)=>{
+    marcasTemp.push(L.circleMarker(v, {radius:5, color:'#0A2218', weight:2,
+      fillColor: i === 0 ? '#E8B65C' : '#6FD69B', fillOpacity:1}).addTo(mapa));
+  });
+
+  atualizarContagemDesenho();
+}
+
+/* A contagem ao vivo é o que torna o desenho útil: dá para ajustar
+   o traçado até a carga ficar do tamanho certo. */
+function atualizarContagemDesenho(){
+  const n = vertices.length >= 3 ? osDentroDe(vertices).length : 0;
+  const el = $('#dsContagem');
+  if(el) el.textContent = n;
+  const b = $('#dsDesignar');
+  if(b) b.disabled = vertices.length < 3 || n === 0;
+  const dica = $('#dsDica');
+  if(dica) dica.textContent = vertices.length < 3
+    ? 'Clique no mapa para marcar os cantos da área.'
+    : 'Duplo clique fecha a área. Ainda dá para acrescentar pontos.';
+}
+
+function fecharDesenho(){
+  if(!desenhando || vertices.length < 3) return;
+  const alvos = osDentroDe(vertices);
+  if(!alvos.length){ aviso('Nenhuma ocorrência dentro dessa área.'); return; }
+  abrirEscolhaTecnico(alvos);
+}
+
+function cancelarDesenho(){
+  desenhando = false;
+  vertices = [];
+  limparTemporario();
+  $('#map').classList.remove('desenhando');
+  mapa.off('click', cliqueDesenho);
+  mapa.off('dblclick', fecharDesenho);
+  mapa.doubleClickZoom.enable();
+  const p = $('#painelDesenho'); if(p) p.hidden = true;
+}
+
+function limparTemporario(){
+  if(linhaTemp){ mapa.removeLayer(linhaTemp); linhaTemp = null; }
+  if(areaTemp){ mapa.removeLayer(areaTemp); areaTemp = null; }
+  marcasTemp.forEach(m => mapa.removeLayer(m));
+  marcasTemp = [];
+}
+
+function desfazerVertice(){
+  vertices.pop();
+  redesenharTemporario();
+}
+
+function mostrarPainelDesenho(){
+  const p = $('#painelDesenho');
+  if(p){ p.hidden = false; atualizarContagemDesenho(); }
+}
+
+/* ---------- designar o técnico da área ---------- */
+function abrirEscolhaTecnico(alvos){
+  const cadastrados = (cfg.tecnicos || []).map(t => t.nome);
+  const jaUsados = territorios.map(t => t.nome);
+  const livres = cadastrados.filter(n => !jaUsados.includes(n));
+  const lista = livres.length ? livres : cadastrados;
+
+  $('#dsEscolha').innerHTML = `
+    <p class="dsTitulo">${alvos.length} ${alvos.length === 1 ? 'ocorrência' : 'ocorrências'} nesta área</p>
+    <p class="dsSub">Quem atende?</p>
+    <div class="dsTecnicos">
+      ${lista.map((n,i)=>`<button data-tec="${esc(n)}" style="--c:${corDoTecnico(n, i)}">
+        <span class="dsPonto"></span>${esc(n)}</button>`).join('')}
+      ${lista.length ? '' : '<p class="vazio">Cadastre técnicos na seção Técnicos.</p>'}
+    </div>
+    <button class="dsOutro" id="dsOutroNome">Outro nome…</button>`;
+  $('#dsEscolha').hidden = false;
+
+  $('#dsEscolha').querySelectorAll('[data-tec]').forEach(b=>{
+    b.onclick = ()=> designarArea(b.dataset.tec, alvos);
+  });
+  $('#dsOutroNome').onclick = ()=>{
+    const nome = prompt('Nome do técnico:');
+    if(nome && nome.trim()) designarArea(nome.trim(), alvos);
+  };
+}
+
+function designarArea(nome, alvos){
+  const idx = territorios.findIndex(t => t.nome === nome);
+  const cor = corDoTecnico(nome, idx >= 0 ? idx : territorios.length);
+
+  // uma OS pertence ao último território desenhado sobre ela
+  territorios.forEach(t => { t.os = t.os.filter(os => !alvos.some(a => a.os === os)); });
+
+  territorios.push({
+    nome, cor,
+    poligono: vertices.slice(),
+    os: alvos.map(a => a.os),
+  });
+
+  const eq = territorios.length - 1;
+  alvos.forEach(a => { a.equipe = eq; a.territorio = nome; });
+
+  $('#dsEscolha').hidden = true;
+  vertices = [];
+  limparTemporario();
+  aplicarTerritorios();
+  redesenharTemporario();
+}
+
+/* Reconstrói cfg.nomes e as camadas a partir dos territórios. */
+function aplicarTerritorios(){
+  cfg.nomes = territorios.map(t => t.nome);
+  cfg.equipes = Math.max(1, territorios.length);
+  cfg.coresTecnicos = cfg.coresTecnicos || {};
+  territorios.forEach((t,i)=>{ if(!cfg.coresTecnicos[t.nome]) cfg.coresTecnicos[t.nome] = t.cor; });
+
+  const dentro = new Set();
+  territorios.forEach((t,i)=> t.os.forEach(os => {
+    const it = itens.find(x => x.os === os);
+    if(it){ it.equipe = i; dentro.add(os); }
+  }));
+  itens.forEach(it=>{ if(!dentro.has(it.os)) it.equipe = null; });
+
+  const pts = itens.filter(it => it.lat && it.equipe !== null);
+  if(pts.length) ordenarVisitas(pts, territorios.length);
+
+  desenharTudo();
+  desenharTerritoriosManuais();
+  listarTerritorios();
+}
+
+function desenharTerritoriosManuais(){
+  if(!camadas.territorios) camadas.territorios = L.layerGroup().addTo(mapa);
+  camadas.territorios.clearLayers();
+  territorios.forEach((t,i)=>{
+    L.polygon(t.poligono, {color: t.cor, weight:1.8, opacity:.75,
+      fillColor: t.cor, fillOpacity:.10}).addTo(camadas.territorios);
+    const c = centroDe(t.poligono.map(v => ({lat:v[0], lon:v[1]})));
+    L.marker([c.lat, c.lon], {interactive:false, icon: L.divIcon({
+      className:'rotuloTerritorio', html:`<span style="--c:${t.cor}">${esc(t.nome)}<b>${t.os.length}</b></span>`,
+      iconSize:[0,0]})}).addTo(camadas.territorios);
+  });
+}
+
+function listarTerritorios(){
+  const alvo = $('#listaTerritorios');
+  if(!alvo) return;
+  const soltas = itens.filter(it => it.lat && it.equipe === null).length;
+
+  if(!territorios.length){
+    alvo.innerHTML = soltas
+      ? `<p class="hint">${soltas} ocorrências sem território. Desenhe uma área no mapa para designar.</p>`
+      : '';
+    return;
+  }
+
+  alvo.innerHTML = territorios.map((t,i)=>{
+    const g = itens.filter(it => it.equipe === i && it.lat);
+    const r = g.length ? resumoEquipe(g, i) : null;
+    return `
+    <div class="terr" data-t="${i}">
+      <div class="terrCab">
+        <span class="terrDot" style="background:${t.cor}"></span>
+        <b>${esc(t.nome)}</b>
+        <span class="terrN">${t.os.length}</span>
+        <button data-apagar="${i}" title="Remover este território">✕</button>
+      </div>
+      ${r ? `<div class="terrInfo">${r.km} km · ${r.jornada}</div>` : ''}
+      <div class="terrLista">${g.map(it =>
+        `<span>${it.ordem}. ${esc(it.cliente || it.endereco)}</span>`).join('')}</div>
+    </div>`;
+  }).join('') +
+  (soltas ? `<p class="hint" style="margin-top:10px">${soltas} ocorrências ainda sem território.</p>` : '');
+
+  alvo.querySelectorAll('[data-apagar]').forEach(b=> b.onclick = ev=>{
+    ev.stopPropagation();
+    territorios.splice(+b.dataset.apagar, 1);
+    aplicarTerritorios();
+  });
+  alvo.querySelectorAll('.terr').forEach(d=> d.onclick = ()=>{
+    const t = territorios[+d.dataset.t];
+    if(t) mapa.fitBounds(L.latLngBounds(t.poligono), {padding:[40,40]});
+  });
+}
+
+function limparTerritorios(){
+  if(territorios.length && !confirm('Apagar todos os territórios desenhados?')) return;
+  territorios = [];
+  itens.forEach(it => { it.equipe = null; it.territorio = null; });
+  aplicarTerritorios();
+}
+
+/* ===========================================================
+   Clientes aglomerados
+
+   Vários chamados a poucos metros um do outro raramente é
+   coincidência: costuma ser CTO com problema, caixa saturada ou
+   rompimento que atingiu o mesmo trecho.
+   =========================================================== */
+let aglomeracoes = [];
+
+function detectarAglomeracoes(raioKm, minimo){
+  raioKm = raioKm || (cfg.aglomRaio || 0.35);
+  minimo = minimo || (cfg.aglomMin || 4);
+
+  const pts = itens.filter(it => it.lat);
+  const usados = new Set();
+  const grupos = [];
+
+  pts.forEach(p=>{
+    if(usados.has(p.os)) return;
+    const perto = pts.filter(q => !usados.has(q.os) && kmEntre(p, q) <= raioKm);
+    if(perto.length < minimo) return;
+
+    perto.forEach(q => usados.add(q.os));
+    const c = centroDe(perto);
+    const raio = Math.max(...perto.map(q => kmEntre(c, q)));
+    grupos.push({
+      n: perto.length, lat: c.lat, lon: c.lon,
+      raio: Math.max(raio, 0.06),
+      os: perto.map(q => q.os),
+      bairros: [...new Set(perto.map(q => (q.partes && q.partes.bairro) || '?'))],
+      reincidentes: perto.filter(q => q.nivel !== 'ok').length,
+      tipos: [...new Set(perto.map(q => q.tipo).filter(Boolean))],
+    });
+  });
+
+  aglomeracoes = grupos.sort((a,b) => b.n - a.n);
+  return aglomeracoes;
+}
+
+function desenharAglomeracoes(){
+  if(!camadas.aglom) camadas.aglom = L.layerGroup().addTo(mapa);
+  camadas.aglom.clearLayers();
+  if(cfg.aglomerar === false) return;
+
+  aglomeracoes.forEach(g=>{
+    L.circle([g.lat, g.lon], {
+      radius: g.raio * 1000 + 60,
+      color: '#E8737F', weight: 1.6, opacity: .7, dashArray: '7 6',
+      fillColor: '#E8737F', fillOpacity: .07, interactive: false,
+    }).addTo(camadas.aglom);
+
+    L.marker([g.lat, g.lon], {
+      interactive: false,
+      icon: L.divIcon({className: 'seloAglom', iconSize: [0,0],
+        html: `<span>${g.n} clientes próximos</span>`}),
+    }).addTo(camadas.aglom);
+  });
+}
+
+function listarAglomeracoes(){
+  const alvo = $('#listaAglom');
+  if(!alvo) return;
+  const cnt = $('#cntAglom');
+  if(cnt) cnt.textContent = aglomeracoes.length || '';
+
+  if(!itens.length){
+    alvo.innerHTML = '<p class="hint">Carregue a planilha do dia.</p>';
+    return;
+  }
+  if(!aglomeracoes.length){
+    alvo.innerHTML = '<p class="hint">Nenhuma concentração de clientes hoje — ' +
+      'as ocorrências estão espalhadas.</p>';
+    return;
+  }
+
+  alvo.innerHTML = aglomeracoes.map((g,i)=>`
+    <div class="aglom" data-a="${i}">
+      <div class="aglomCab">
+        <b>${g.n} clientes</b>
+        <span>em ${(g.raio * 1000).toFixed(0)} m</span>
+      </div>
+      <div class="aglomSub">${esc(g.bairros.join(', '))}</div>
+      ${g.reincidentes ? `<div class="aglomAlerta">${g.reincidentes} ${
+        g.reincidentes === 1 ? 'é reincidente' : 'são reincidentes'} — pode ser problema de rede</div>` : ''}
+      ${g.tipos.length ? `<div class="aglomSub">${esc(g.tipos.slice(0,3).join(' · '))}</div>` : ''}
+    </div>`).join('');
+
+  alvo.querySelectorAll('.aglom').forEach(d=> d.onclick = ()=>{
+    const g = aglomeracoes[+d.dataset.a];
+    mapa.setView([g.lat, g.lon], 16);
+  });
+}
+
+function atualizarAglomeracoes(){
+  detectarAglomeracoes();
+  desenharAglomeracoes();
+  listarAglomeracoes();
+}
+
+
 /* ---------- exportações ---------- */
 function exportarPlano(){
   if(!itens.length) return;
@@ -5926,6 +6395,14 @@ $('#btnRemap').onclick = ()=>{
 $('#btnEscala').onclick = abrirEscala;
 
 /* --- aba Distribuição --- */
+$('#btnDesenhar').onclick = iniciarDesenho;
+$('#btnLimparTerr').onclick = limparTerritorios;
+$('#dsFechar').onclick = cancelarDesenho;
+$('#dsDesfazer').onclick = desfazerVertice;
+$('#dsDesignar').onclick = fecharDesenho;
+$('#aglomRaio').onchange = ()=>{ cfg.aglomRaio = +$('#aglomRaio').value; Base.set(K_CFG,cfg); atualizarAglomeracoes(); };
+$('#aglomMin').onchange = ()=>{ cfg.aglomMin = +$('#aglomMin').value; Base.set(K_CFG,cfg); atualizarAglomeracoes(); };
+$('#cfgAglomerar').onchange = ()=>{ cfg.aglomerar = $('#cfgAglomerar').checked; Base.set(K_CFG,cfg); desenharAglomeracoes(); };
 $('#btnDistAbrir').onclick = abrirEscala;
 $('#btnDistRebalancear').onclick = rebalancear;
 $('#btnDistRecalcular').onclick = recalcularRotas;
@@ -6096,6 +6573,7 @@ $('#pnAbas').onclick = e=>{
 };
 addEventListener('keydown', e=>{
   if(e.key !== 'Escape') return;
+  if(desenhando){ cancelarDesenho(); return; }
   if($('#modalEquip') && !$('#modalEquip').hidden){ $('#modalEquip').hidden = true; return; }
   if($('#modalEscala') && !$('#modalEscala').hidden){
     $('#modalEscala').hidden = true;
